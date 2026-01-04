@@ -1,53 +1,48 @@
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
-import type { Payload } from 'payload'
-import { seedRolesAndDepartments } from './roles-departments'
+import { db } from '@/db'
+import {
+  usersTable,
+  rolesTable,
+  departmentsTable,
+  userDepartmentsTable,
+  payrollSettingsTable,
+  payrollTable,
+  inventoryTable,
+  leavesTable,
+} from '@/db/schema'
+import { eq } from 'drizzle-orm'
+import { hash } from 'bcryptjs'
 
 export async function seed() {
-  const payload = await getPayload({ config: configPromise })
-
   console.log('🌱 Starting database seeding...')
 
   try {
-    // Clear existing data first (optional)
-    // await clearDatabase(payload)
-
     // 1. Create Roles and Departments
     console.log('📁 Creating roles and departments...')
-    await seedRolesAndDepartments(payload)
+    await seedRolesAndDepartments()
 
     // Fetch created departments and roles
-    const departmentsData = await payload.find({
-      collection: 'departments',
-      limit: 100,
-    })
-    const rolesData = await payload.find({
-      collection: 'roles',
-      limit: 100,
-    })
-
-    const departments = departmentsData.docs
-    const roles = rolesData.docs
+    const departments = await db.query.departmentsTable.findMany()
+    const roles = await db.query.rolesTable.findMany()
 
     // 2. Create Users (Marvel characters)
     console.log('🦸 Creating Marvel characters as users...')
-    const users = await seedMarvelCharacters(payload, departments, roles)
+    const users = await seedMarvelCharacters(departments, roles)
 
     // 3. Create Payroll Settings for each user
     console.log('💰 Creating payroll settings...')
-    await seedPayrollSettings(payload, users)
+    await seedPayrollSettings(users)
 
     // 4. Create Payroll History (last 3 months)
-    console.log('� Creating payroll history...')
-    await seedPayrollHistory(payload, users)
+    console.log('📊 Creating payroll history...')
+    await seedPayrollHistory(users)
 
     // 5. Create Inventory (30 items assigned to users)
     console.log('💻 Creating inventory items...')
-    await seedInventory(payload, users)
+    await seedInventory(users)
 
     // 6. Create Leave records
     console.log('🏖️ Creating leave records...')
-    await seedLeaves(payload, users)
+    await seedLeaves(users)
 
     console.log('✅ Database seeding completed successfully!')
     return { success: true }
@@ -69,7 +64,7 @@ function getRandomItem<T>(arr: T[]): T {
 }
 
 // Marvel Characters Data
-async function seedMarvelCharacters(payload: Payload, departments: any[], roles: any[]) {
+async function seedMarvelCharacters(departments: any[], roles: any[]) {
   // Find departments by name
   const findDepts = (names: string[]) => {
     return names.map((name) => departments.find((d) => d.name === name)?.id).filter(Boolean)
@@ -84,10 +79,9 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'mohammad',
       secondaryEmail: '',
       password: '123321',
-      isSuperAdmin: true, // Super admin - has full access
       jobTitle: 'System Administrator',
-      departments: findDepts(['Human Resources']), // HR department for admin
-      role: findRole('HR Manager'),
+      departments: findDepts(['Human Resources']),
+      role: findRole('admin'),
       birthDate: '1992-05-15',
       primaryPhone: '+1-555-MOHAMMAD',
       secondaryPhone: '',
@@ -104,7 +98,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'tstark',
       secondaryEmail: 'ironman@stark.industries',
       password: 'IAmIronMan123!',
-      isSuperAdmin: false,
       jobTitle: 'Chief Technology Officer',
       departments: findDepts(['Field', 'English']),
       role: findRole('Field Agent'),
@@ -124,7 +117,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'nromanoff',
       secondaryEmail: 'blackwidow@avengers.com',
       password: 'RedRoom123!',
-      isSuperAdmin: false,
       jobTitle: 'Senior Field Agent',
       departments: findDepts(['Field', 'Russian', 'English']),
       role: findRole('Field Agent'),
@@ -143,7 +135,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'srogers',
       secondaryEmail: 'captainamerica@avengers.com',
       password: 'Brooklyn1918!',
-      isSuperAdmin: false,
       jobTitle: 'Operations Manager',
       departments: findDepts(['Field', 'English']),
       role: findRole('Department Manager'),
@@ -162,7 +153,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'bbanner',
       secondaryEmail: 'hulk@gamma.lab',
       password: 'GreenGiant123!',
-      isSuperAdmin: false,
       jobTitle: 'Research Scientist',
       departments: findDepts(['Marketing', 'English']),
       role: findRole('Marketing Specialist'),
@@ -181,11 +171,10 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'thor',
       secondaryEmail: 'godofthunder@asgard.realm',
       password: 'Mjolnir123!',
-      isSuperAdmin: false,
       jobTitle: 'Field Operations Lead',
       departments: findDepts(['Field', 'English']),
       role: findRole('Field Agent'),
-      birthDate: '1985-01-01', // Changed from year 965 to avoid date validation issues
+      birthDate: '1985-01-01',
       primaryPhone: '+1-555-THUNDER',
       employmentType: 'other',
       nationality: 'Asgardian',
@@ -200,7 +189,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'pparker',
       secondaryEmail: 'spiderman@queens.ny',
       password: 'WebSlinger123!',
-      isSuperAdmin: false,
       jobTitle: 'Junior Field Agent',
       departments: findDepts(['Field', 'English']),
       role: findRole('Field Agent'),
@@ -218,8 +206,7 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       email: 'wanda.maximoff@shield.marvel',
       username: 'wmaximoff',
       secondaryEmail: 'scarletwitch@hex.magic',
-      password: 'ChaosM agic123!',
-      isSuperAdmin: false,
+      password: 'ChaosMagic123!',
       jobTitle: 'Special Operations Agent',
       departments: findDepts(['Field', 'Russian', 'English']),
       role: findRole('Field Agent'),
@@ -239,7 +226,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'sstrange',
       secondaryEmail: 'drstrange@sanctum.mystic',
       password: 'TimeSt0ne123!',
-      isSuperAdmin: false,
       jobTitle: 'Medical Consultant',
       departments: findDepts(['Dental Clinic - Doctors', 'English']),
       role: findRole('Doctor'),
@@ -258,7 +244,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'cdanvers',
       secondaryEmail: 'captainmarvel@space.force',
       password: 'Binary123!',
-      isSuperAdmin: false,
       jobTitle: 'Senior Field Agent',
       departments: findDepts(['Field', 'English']),
       role: findRole('Field Agent'),
@@ -277,7 +262,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'tchalla',
       secondaryEmail: 'blackpanther@wakanda.nation',
       password: 'Vibranium123!',
-      isSuperAdmin: false,
       jobTitle: 'International Relations Manager',
       departments: findDepts(['Sales', 'English', 'French']),
       role: findRole('Sales Representative'),
@@ -296,7 +280,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'cbarton',
       secondaryEmail: 'hawkeye@avengers.com',
       password: 'BullsEye123!',
-      isSuperAdmin: false,
       jobTitle: 'Field Agent',
       departments: findDepts(['Field', 'English']),
       role: findRole('Field Agent'),
@@ -315,7 +298,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'slang',
       secondaryEmail: 'antman@pym.tech',
       password: 'Quantum123!',
-      isSuperAdmin: false,
       jobTitle: 'Technical Specialist',
       departments: findDepts(['Transfer', 'English']),
       role: findRole('Sales Representative'),
@@ -334,7 +316,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'hvandyne',
       secondaryEmail: 'wasp@pym.tech',
       password: 'WaspWings123!',
-      isSuperAdmin: false,
       jobTitle: 'Operations Specialist',
       departments: findDepts(['Transfer', 'English']),
       role: findRole('Sales Representative'),
@@ -353,7 +334,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'swilson',
       secondaryEmail: 'falcon@avengers.com',
       password: 'Wingman123!',
-      isSuperAdmin: false,
       jobTitle: 'Field Operations Manager',
       departments: findDepts(['Field', 'English']),
       role: findRole('Field Agent'),
@@ -372,7 +352,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'bbarnes',
       secondaryEmail: 'wintersoldier@hydra.defunct',
       password: 'WhiteWolf123!',
-      isSuperAdmin: false,
       jobTitle: 'Security Specialist',
       departments: findDepts(['Field', 'English', 'Russian']),
       role: findRole('Field Agent'),
@@ -391,10 +370,9 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'nfury',
       secondaryEmail: 'director@shield.gov',
       password: 'OnlyOneEye123!',
-      isSuperAdmin: false,
       jobTitle: 'Director of Operations',
       departments: findDepts(['Human Resources']),
-      role: findRole('HR Manager'),
+      role: findRole('admin'),
       birthDate: '1951-07-04',
       primaryPhone: '+1-555-FURY',
       employmentType: 'citizen',
@@ -410,7 +388,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'shuri',
       secondaryEmail: 'blackpanther@wakanda.lab',
       password: 'TechGenius123!',
-      isSuperAdmin: false,
       jobTitle: 'Technology Innovation Lead',
       departments: findDepts(['Marketing', 'English']),
       role: findRole('Marketing Specialist'),
@@ -429,7 +406,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'pmaximoff',
       secondaryEmail: 'quicksilver@speed.fast',
       password: 'FastRunner123!',
-      isSuperAdmin: false,
       jobTitle: 'Rapid Response Agent',
       departments: findDepts(['Field', 'Russian', 'English']),
       role: findRole('Field Agent'),
@@ -449,7 +425,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'kkhan',
       secondaryEmail: 'msmarvel@jersey.city',
       password: 'Embiggen123!',
-      isSuperAdmin: false,
       jobTitle: 'Junior Marketing Specialist',
       departments: findDepts(['Marketing', 'English']),
       role: findRole('Marketing Specialist'),
@@ -468,7 +443,6 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
       username: 'mspector',
       secondaryEmail: 'moonknight@khonshu.egypt',
       password: 'MoonKnight123!',
-      isSuperAdmin: false,
       jobTitle: 'Night Operations Agent',
       departments: findDepts(['Field', 'English']),
       role: findRole('Field Agent'),
@@ -486,10 +460,44 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
   const users = []
   for (const character of marvelCharacters) {
     try {
-      const created = await payload.create({
-        collection: 'users',
-        data: character as any,
-      })
+      const hashedPassword = await hash(character.password, 10)
+      const deptIds = character.departments
+
+      const [created] = await db
+        .insert(usersTable)
+        .values({
+          fullName: character.fullName,
+          email: character.email,
+          username: character.username,
+          secondaryEmail: character.secondaryEmail || null,
+          password: hashedPassword,
+          jobTitle: character.jobTitle,
+          roleId: character.role,
+          birthDate: new Date(character.birthDate),
+          primaryPhone: character.primaryPhone,
+          secondaryPhone: character.secondaryPhone || null,
+          employmentType: character.employmentType as any,
+          nationality: character.nationality,
+          identityNumber: character.identityNumber,
+          workPermitExpiry: character.workPermitExpiry
+            ? new Date(character.workPermitExpiry)
+            : null,
+          address: character.address,
+          joinedAt: new Date(character.joinedAt),
+          isActive: character.isActive,
+        })
+        .returning()
+
+      // Link user to departments
+      if (deptIds && deptIds.length > 0) {
+        for (const deptId of deptIds) {
+          await db.insert(userDepartmentsTable).values({
+            userId: created.id,
+            departmentId: deptId,
+          })
+        }
+      }
+
       users.push(created)
       console.log(`  ✓ Created user: ${character.fullName}`)
     } catch (error) {
@@ -501,7 +509,7 @@ async function seedMarvelCharacters(payload: Payload, departments: any[], roles:
 }
 
 // Payroll Settings - Create ongoing salary settings for each user
-async function seedPayrollSettings(payload: Payload, users: any[]) {
+async function seedPayrollSettings(users: any[]) {
   const payrollSettings = []
 
   // Base salaries by role type
@@ -516,21 +524,25 @@ async function seedPayrollSettings(payload: Payload, users: any[]) {
 
   for (const user of users) {
     try {
-      const roleName = typeof user.role === 'object' ? user.role.name : 'Field Agent'
+      // Get user's role to determine salary
+      const userRole = user.role
+        ? await db.query.rolesTable.findFirst({
+            where: eq(rolesTable.id, user.role),
+          })
+        : null
+      const roleName = userRole?.name || 'Field Agent'
       const baseSalary = salaryRanges[roleName] || 6000
 
       // Primary Salary
-      const primarySalary = await payload.create({
-        collection: 'payroll-settings',
-        data: {
-          employee: user.id,
+      const [primarySalary] = await db
+        .insert(payrollSettingsTable)
+        .values({
+          employeeId: user.id,
           payrollType: 'primary',
           description: `Monthly Salary - ${user.fullName}`,
-          paymentDetails: {
-            amount: baseSalary,
-            paymentType: 'bankTransfer',
-            paymentFrequency: 'monthly',
-          },
+          amount: baseSalary.toString(),
+          paymentType: 'bankTransfer',
+          paymentFrequency: 'monthly',
           bankAccount: {
             accountNumber: `ACC${Math.floor(Math.random() * 1000000)}`,
             bankName: 'SHIELD Credit Union',
@@ -538,32 +550,26 @@ async function seedPayrollSettings(payload: Payload, users: any[]) {
             swiftCode: 'SHIELDXX',
           },
           isActive: true,
-          effectiveDate: {
-            startDate: user.joinedAt || new Date().toISOString(),
-          },
-        },
-      })
+          startDate: user.joinedAt || new Date(),
+        })
+        .returning()
       payrollSettings.push(primarySalary)
 
       // Random bonuses for some users (30% chance)
       if (Math.random() > 0.7) {
-        const bonus = await payload.create({
-          collection: 'payroll-settings',
-          data: {
-            employee: user.id,
+        const [bonus] = await db
+          .insert(payrollSettingsTable)
+          .values({
+            employeeId: user.id,
             payrollType: 'bonus',
             description: `Performance Bonus - ${user.fullName}`,
-            paymentDetails: {
-              amount: Math.floor(Math.random() * 2000) + 500,
-              paymentType: 'bankTransfer',
-              paymentFrequency: 'monthly',
-            },
+            amount: (Math.floor(Math.random() * 2000) + 500).toString(),
+            paymentType: 'bankTransfer',
+            paymentFrequency: 'monthly',
             isActive: true,
-            effectiveDate: {
-              startDate: user.joinedAt || new Date().toISOString(),
-            },
-          },
-        })
+            startDate: user.joinedAt || new Date(),
+          })
+          .returning()
         payrollSettings.push(bonus)
       }
 
@@ -577,7 +583,7 @@ async function seedPayrollSettings(payload: Payload, users: any[]) {
 }
 
 // Payroll History - Create payroll records for last 3 months
-async function seedPayrollHistory(payload: Payload, users: any[]) {
+async function seedPayrollHistory(users: any[]) {
   const currentDate = new Date()
   const currentYear = currentDate.getFullYear()
   const currentMonth = currentDate.getMonth() + 1 // 1-12
@@ -596,23 +602,22 @@ async function seedPayrollHistory(payload: Payload, users: any[]) {
 
   for (const user of users) {
     // Get this user's payroll settings
-    const settings = await payload.find({
-      collection: 'payroll-settings',
-      where: {
-        and: [{ employee: { equals: user.id } }, { isActive: { equals: true } }],
-      },
+    const settings = await db.query.payrollSettingsTable.findMany({
+      where: eq(payrollSettingsTable.employeeId, user.id),
     })
 
     for (const period of months) {
       try {
         // Build payroll items from settings
-        const payrollItems = settings.docs.map((setting: any) => ({
-          payrollSetting: setting.id,
-          description: setting.description || `${setting.payrollType} payment`,
-          payrollType: setting.payrollType,
-          amount: setting.paymentDetails?.amount || 0,
-          paymentType: setting.paymentDetails?.paymentType || 'bankTransfer',
-        }))
+        const payrollItems = settings
+          .filter((s) => s.isActive)
+          .map((setting: any) => ({
+            payrollSetting: setting.id,
+            description: setting.description || `${setting.payrollType} payment`,
+            payrollType: setting.payrollType,
+            amount: setting.amount || 0,
+            paymentType: setting.paymentType || 'bankTransfer',
+          }))
 
         // Calculate total
         const totalFromSettings = payrollItems.reduce(
@@ -632,55 +637,30 @@ async function seedPayrollHistory(payload: Payload, users: any[]) {
 
         const payrollData: any = {
           employee: user.id,
-          period: {
-            month: period.month as
-              | '01'
-              | '02'
-              | '03'
-              | '04'
-              | '05'
-              | '06'
-              | '07'
-              | '08'
-              | '09'
-              | '10'
-              | '11'
-              | '12',
-            year: period.year,
-          },
+          month: period.month as any,
+          year: period.year,
           payrollItems,
-          adjustments: {
-            bonusAmount,
-            deductionAmount,
-            adjustmentNote:
-              bonusAmount > 0
-                ? 'Performance bonus'
-                : deductionAmount > 0
-                  ? 'Late arrival deduction'
-                  : undefined,
-          },
+          bonusAmount,
+          deductionAmount,
+          adjustmentNote:
+            bonusAmount > 0
+              ? 'Performance bonus'
+              : deductionAmount > 0
+                ? 'Late arrival deduction'
+                : null,
           totalAmount,
           status,
         }
 
         // Add payment details if paid
         if (status === 'paid') {
-          payrollData.paymentDetails = {
-            paymentDate: new Date(period.year, parseInt(period.month) - 1, 28).toISOString(),
-            paymentReference: `TXN-${Math.floor(Math.random() * 1000000)}`,
-            paymentNotes: 'Payment processed successfully',
-          }
-          payrollData.processedAt = new Date(
-            period.year,
-            parseInt(period.month) - 1,
-            28,
-          ).toISOString()
+          payrollData.paymentDate = new Date(period.year, parseInt(period.month) - 1, 28)
+          payrollData.paymentReference = `TXN-${Math.floor(Math.random() * 1000000)}`
+          payrollData.paymentNotes = 'Payment processed successfully'
+          payrollData.processedAt = new Date(period.year, parseInt(period.month) - 1, 28)
         }
 
-        const created = await payload.create({
-          collection: 'payroll',
-          data: payrollData,
-        })
+        const [created] = await db.insert(payrollTable).values(payrollData).returning()
         payrolls.push(created)
       } catch (error) {
         console.error(
@@ -696,7 +676,7 @@ async function seedPayrollHistory(payload: Payload, users: any[]) {
 }
 
 // Inventory - 30 items (laptops, phones, sim cards)
-async function seedInventory(payload: Payload, users: any[]) {
+async function seedInventory(users: any[]) {
   const laptopModels = [
     'MacBook Pro 16" M3 Pro',
     'MacBook Pro 14" M3',
@@ -765,10 +745,19 @@ async function seedInventory(payload: Payload, users: any[]) {
   const inventory = []
   for (const item of inventoryData) {
     try {
-      const created = await payload.create({
-        collection: 'inventory',
-        data: item,
-      })
+      const [created] = await db
+        .insert(inventoryTable)
+        .values({
+          itemType: item.itemType,
+          model: item.model,
+          serialNumber: item.serialNumber,
+          holderId: item.holder,
+          status: item.status,
+          purchaseDate: new Date(item.purchaseDate),
+          warrantyExpiry: item.warrantyExpiry ? new Date(item.warrantyExpiry) : null,
+          notes: item.notes || null,
+        })
+        .returning()
       inventory.push(created)
     } catch (error) {
       console.error(`  ✗ Failed to create inventory item:`, error)
@@ -780,7 +769,7 @@ async function seedInventory(payload: Payload, users: any[]) {
 }
 
 // Leaves - Random leave days for users
-async function seedLeaves(payload: Payload, users: any[]) {
+async function seedLeaves(users: any[]) {
   const leaveTypes: Array<'annual' | 'sick' | 'unpaid' | 'other'> = [
     'annual',
     'sick',
@@ -826,25 +815,23 @@ async function seedLeaves(payload: Payload, users: any[]) {
           ? (getRandomItem(['approved', 'approved', 'rejected']) as 'approved' | 'rejected')
           : (getRandomItem(['requested', 'approved']) as 'requested' | 'approved')
 
-        const leaveData = {
-          user: user.id,
-          type: getRandomItem(leaveTypes),
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
-          status,
-          reason: getRandomItem(leaveReasons),
-          note:
-            status === 'rejected'
-              ? 'Insufficient notice period'
-              : status === 'approved'
-                ? 'Approved by manager'
-                : undefined,
-        }
-
-        const created = await payload.create({
-          collection: 'leave-days',
-          data: leaveData,
-        })
+        const [created] = await db
+          .insert(leavesTable)
+          .values({
+            userId: user.id,
+            type: getRandomItem(leaveTypes),
+            startDate,
+            endDate,
+            status,
+            reason: getRandomItem(leaveReasons),
+            note:
+              status === 'rejected'
+                ? 'Insufficient notice period'
+                : status === 'approved'
+                  ? 'Approved by manager'
+                  : null,
+          })
+          .returning()
         leaves.push(created)
       } catch (error) {
         console.error(`  ✗ Failed to create leave for ${user.fullName}:`, error)
@@ -854,4 +841,71 @@ async function seedLeaves(payload: Payload, users: any[]) {
   }
 
   return leaves
+}
+
+// ============================================
+// Seed Roles and Departments
+// ============================================
+
+async function seedRolesAndDepartments() {
+  console.log('Seeding roles and departments...')
+
+  // Check if roles already exist
+  const existingRoles = await db.query.rolesTable.findMany({ limit: 1 })
+
+  if (existingRoles.length === 0) {
+    // Create 3 simple roles for Stage 1
+    const simpleRoles = [
+      {
+        name: 'admin',
+        displayName: 'Administrator',
+        description: 'Full system access - can manage all users, settings, and data',
+      },
+      {
+        name: 'manager',
+        displayName: 'Manager',
+        description: 'Full access to dashboard - can view and manage team data',
+      },
+      {
+        name: 'employee',
+        displayName: 'Employee',
+        description: 'Limited access - can only view and edit own profile',
+      },
+    ]
+
+    for (const role of simpleRoles) {
+      await db.insert(rolesTable).values(role)
+      console.log(`  ✓ Created role: ${role.displayName} (${role.name})`)
+    }
+  } else {
+    console.log('  ⊘ Roles already exist, skipping...')
+  }
+
+  // Check if departments already exist
+  const existingDepts = await db.query.departmentsTable.findMany({ limit: 1 })
+
+  if (existingDepts.length === 0) {
+    // Create simple departments for Stage 1
+    const simpleDepartments = [
+      { name: 'Engineering', description: 'Software development and technical teams' },
+      { name: 'Design', description: 'UI/UX and graphic design team' },
+      { name: 'Marketing', description: 'Marketing and communications team' },
+      { name: 'Sales', description: 'Sales and business development team' },
+      { name: 'Human Resources', description: 'HR and people operations' },
+      { name: 'Finance', description: 'Finance and accounting team' },
+    ]
+
+    for (const dept of simpleDepartments) {
+      await db.insert(departmentsTable).values({
+        name: dept.name,
+        description: dept.description,
+        isActive: true,
+      })
+      console.log(`  ✓ Created department: ${dept.name}`)
+    }
+  } else {
+    console.log('  ⊘ Departments already exist, skipping...')
+  }
+
+  console.log('Roles and departments seeding completed!')
 }

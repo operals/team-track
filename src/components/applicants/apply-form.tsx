@@ -83,40 +83,22 @@ export function ApplyForm() {
     setIsSubmitting(true)
 
     try {
-      // First, upload the CV file using the public upload endpoint
-      const cvFormData = new FormData()
-      cvFormData.append('file', cvFile)
+      // Submit everything to the apply endpoint in one request
+      const submitFormData = new FormData()
 
-      const uploadResponse = await fetch('/api/upload-cv', {
-        method: 'POST',
-        body: cvFormData,
+      // Add all text fields
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value !== '' && value !== null && value !== undefined) {
+          submitFormData.append(key, String(value))
+        }
       })
 
-      if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json()
-        throw new Error(errorData.message || 'Failed to upload CV')
-      }
-
-      const uploadData = await uploadResponse.json()
-      const cvId = uploadData.doc.id
-
-      // Then, submit the application
-      const applicationData = {
-        ...formData,
-        yearsOfExperience: parseFloat(formData.yearsOfExperience),
-        expectedSalary: formData.expectedSalary ? parseFloat(formData.expectedSalary) : undefined,
-        // skills: skills.map((skill) => ({ skill })),
-        cv: cvId,
-        status: 'new',
-        applicationDate: new Date().toISOString(),
-      }
+      // Add CV file
+      submitFormData.append('cv', cvFile)
 
       const response = await fetch('/api/apply', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(applicationData),
+        body: submitFormData,
       })
 
       if (!response.ok) {
@@ -278,8 +260,8 @@ export function ApplyForm() {
                   <SelectContent>
                     <SelectItem value="high-school">High School</SelectItem>
                     <SelectItem value="associate">Associate Degree</SelectItem>
-                    <SelectItem value="bachelor">Bachelor's Degree</SelectItem>
-                    <SelectItem value="master">Master's Degree</SelectItem>
+                    <SelectItem value="bachelor">Bachelor&apos;s Degree</SelectItem>
+                    <SelectItem value="master">Master&apos;s Degree</SelectItem>
                     <SelectItem value="phd">Doctorate (PhD)</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>

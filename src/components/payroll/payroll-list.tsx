@@ -13,11 +13,21 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Plus, FileSpreadsheet, Search } from 'lucide-react'
-import type { Payroll, User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { payrollTable, usersTable } from '@/db/schema'
+
+type Payroll = InferSelectModel<typeof payrollTable>
+type User = InferSelectModel<typeof usersTable>
+
+type PayrollWithEmployee = Payroll & {
+  employee?: User | null
+  processedBy?: User | null
+}
+
 import { PayrollTable } from '@/components/payroll/table'
 
 interface PayrollListProps {
-  data: Payroll[]
+  data: PayrollWithEmployee[]
 }
 
 export function PayrollList({ data }: PayrollListProps) {
@@ -68,7 +78,7 @@ export function PayrollList({ data }: PayrollListProps) {
       const additionalText = isAdditional ? 'additional' : ''
 
       // Apply period filter (month and year)
-      if (item.period?.month !== selectedMonth || item.period?.year !== selectedYear) {
+      if (item.month !== selectedMonth || item.year !== selectedYear) {
         return false
       }
 
@@ -97,8 +107,8 @@ export function PayrollList({ data }: PayrollListProps) {
     years.add(currentYear)
 
     data.forEach((item) => {
-      if (item.period?.month) months.add(item.period.month)
-      if (item.period?.year) years.add(item.period.year)
+      if (item.month) months.add(item.month)
+      if (item.year) years.add(item.year)
     })
 
     return {

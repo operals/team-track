@@ -3,7 +3,10 @@
 import * as React from 'react'
 import { Switch } from '@/components/ui/switch'
 import { Loader2 } from 'lucide-react'
-import type { User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { usersTable } from '@/db/schema'
+
+type User = InferSelectModel<typeof usersTable>
 
 interface UserStatusToggleProps {
   user: User
@@ -30,19 +33,18 @@ export function UserStatusToggle({ user, onStatusChange }: UserStatusToggleProps
   }
 
   return (
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-3">
-
-            <div className="flex items-center space-x-2">
-              {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-              <Switch
-                checked={isActive}
-                onCheckedChange={handleToggle}
-                disabled={isLoading}
-                aria-label="Toggle user active status"
-              />
-            </div>
-          </div>
+    <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2">
+          {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+          <Switch
+            checked={isActive}
+            onCheckedChange={handleToggle}
+            disabled={isLoading}
+            aria-label="Toggle user active status"
+          />
         </div>
+      </div>
+    </div>
   )
 }

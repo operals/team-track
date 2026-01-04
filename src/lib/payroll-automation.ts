@@ -1,54 +1,38 @@
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
-import type { User, Payroll } from '@/payload-types'
+import { db } from '@/db'
+import { usersTable, payrollSettingsTable, payrollTable, leavesTable } from '@/db/schema'
+import { eq, and, lte, gte } from 'drizzle-orm'
 
 export async function generateMonthlyPayrolls(month: string, year: number) {
   try {
-    const payload = await getPayload({ config: configPromise })
-
     // Get all active employees with employment data
-    const employees = await payload.find({
-      collection: 'users',
-      where: {
-        isActive: {
-          equals: true,
-        },
-      },
+    const employees = await db.query.usersTable.findMany({
+      where: eq(usersTable.isActive, true),
       limit: 100,
     })
 
-    const payrollPromises = employees.docs.map(async (user) => {
+    const payrollPromises = employees.map(async (user) => {
       // Check if payroll already exists for this period
-      const existingPayroll = await payload.find({
-        collection: 'payroll',
-        where: {
-          and: [
-            { employee: { equals: user.id } },
-            { 'period.month': { equals: month } },
-            { 'period.year': { equals: year } },
-          ],
-        },
+      const existingPayroll = await db.query.payrollTable.findFirst({
+        where: and(
+          eq(payrollTable.employeeId, user.id),
+          eq(payrollTable.month, month),
+          eq(payrollTable.year, year),
+        ),
       })
 
-      if (existingPayroll.docs.length > 0) {
+      if (existingPayroll) {
         return null // Skip if already exists
       }
 
       // Get payroll settings for this employee
-      const payrollSettings = await payload.find({
-        collection: 'payroll-settings',
-        where: {
-          employee: { equals: user.id },
-        },
-        limit: 1,
+      const settings = await db.query.payrollSettingsTable.findFirst({
+        where: eq(payrollSettingsTable.employeeId, user.id),
       })
 
       // Skip if no payroll settings found
-      if (!payrollSettings.docs.length) {
+      if (!settings) {
         return null
       }
-
-      const settings = payrollSettings.docs[0]
 
       // Calculate leave days for the period
       const leaveDays = await calculateLeaveDays(String(user.id), month, year)
@@ -59,50 +43,48 @@ export async function generateMonthlyPayrolls(month: string, year: number) {
 
       // Calculate prorated amount if employee didn't work full month
       const prorationFactor = daysWorked / totalWorkingDays
-      const proratedAmount = settings.paymentDetails.amount * prorationFactor
+      const proratedAmount = Number(settings.amount) * prorationFactor
 
       // Create payroll record
-      return payload.create({
-        collection: 'payroll',
-        data: {
-          employee: user.id,
-          period: {
-            month: month as
-              | '01'
-              | '02'
-              | '03'
-              | '04'
-              | '05'
-              | '06'
-              | '07'
-              | '08'
-              | '09'
-              | '10'
-              | '11'
-              | '12',
-            year,
-          },
+      const [newPayroll] = await db
+        .insert(payrollTable)
+        .values({
+          employeeId: user.id,
+          month: month as
+            | '01'
+            | '02'
+            | '03'
+            | '04'
+            | '05'
+            | '06'
+            | '07'
+            | '08'
+            | '09'
+            | '10'
+            | '11'
+            | '12',
+          year,
           payrollItems: [
             {
-              payrollSetting: settings.id,
+              payrollSettingId: settings.id,
               description: settings.description || 'Monthly Salary',
               payrollType: settings.payrollType,
               amount: proratedAmount,
-              paymentType: settings.paymentDetails.paymentType,
+              paymentType: settings.paymentType,
             },
           ],
-          adjustments: {
-            bonusAmount: 0,
-            deductionAmount: 0,
-            adjustmentNote:
-              leaveDays.unpaidDays > 0
-                ? `Prorated for ${daysWorked}/${totalWorkingDays} working days (${leaveDays.unpaidDays} unpaid leave days)`
-                : '',
-          },
-          totalAmount: proratedAmount,
+          bonusAmount: '0',
+          deductionAmount: '0',
+          adjustmentNote:
+            leaveDays.unpaidDays > 0
+              ? `Prorated for ${daysWorked}/${totalWorkingDays} working days (${leaveDays.unpaidDays} unpaid leave days)`
+              : '',
+          totalAmount: String(proratedAmount),
           status: 'generated',
-        },
-      })
+        })
+        .returning()
+
+      return newPayroll
     })
 
     const results = await Promise.all(payrollPromises)
@@ -114,27 +96,22 @@ export async function generateMonthlyPayrolls(month: string, year: number) {
 }
 
 async function calculateLeaveDays(employeeId: string, month: string, year: number) {
-  const payload = await getPayload({ config: configPromise })
-
   const startDate = new Date(year, parseInt(month) - 1, 1)
   const endDate = new Date(year, parseInt(month), 0)
 
-  const leaves = await payload.find({
-    collection: 'leave-days',
-    where: {
-      and: [
-        { user: { equals: employeeId } },
-        { status: { equals: 'approved' } },
-        { startDate: { less_than_equal: endDate.toISOString() } },
-        { endDate: { greater_than_equal: startDate.toISOString() } },
-      ],
-    },
+  const leaves = await db.query.leavesTable.findMany({
+    where: and(
+      eq(leavesTable.userId, employeeId),
+      eq(leavesTable.status, 'approved'),
+      lte(leavesTable.startDate, endDate),
+      gte(leavesTable.endDate, startDate),
+    ),
   })
 
   let totalDays = 0
   let unpaidDays = 0
 
-  leaves.docs.forEach((leave) => {
+  leaves.forEach((leave) => {
     totalDays += leave.totalDays || 0
     if (leave.type === 'unpaid') {
       unpaidDays += leave.totalDays || 0

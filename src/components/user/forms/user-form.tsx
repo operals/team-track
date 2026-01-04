@@ -8,7 +8,26 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 // Select handled via SelectField wrapper
 import { ProfilePhotoUpload } from '@/components/ui/profile-photo-upload'
 import { ArrowLeft, Save, X } from 'lucide-react'
-import type { User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { usersTable } from '@/db/schema'
+
+type User = InferSelectModel<typeof usersTable> & {
+  role?: { id: string; name: string } | null
+  departments?: Array<{
+    id: string
+    userId: string
+    departmentId: string
+    createdAt: Date
+    department: {
+      id: string
+      name: string
+      isActive: boolean
+      createdAt: Date
+      updatedAt: Date
+      description: string | null
+    }
+  }>
+}
 import { useForm, Controller, SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { UserFormSchema, type UserFormValues } from './user-form.schema'
@@ -49,22 +68,14 @@ export function UserForm({
     email: initialData?.email || '',
     password: '',
     confirmPassword: '',
-    photo:
-      typeof initialData?.photo === 'object' && initialData.photo && 'url' in initialData.photo
-        ? (initialData.photo as { url: string }).url || null
-        : typeof initialData?.photo === 'string'
-          ? initialData.photo
-          : null,
+    photo: initialData?.photo || null,
     departments:
       Array.isArray(initialData?.departments) && initialData.departments.length > 0
-        ? initialData.departments.map((dept) => String(typeof dept === 'object' ? dept.id : dept))
+        ? initialData.departments.map((dept: any) =>
+            String(typeof dept === 'object' ? dept.id : dept),
+          )
         : [],
-    role:
-      typeof initialData?.role === 'object' && initialData.role && 'id' in initialData.role
-        ? String(initialData.role.id)
-        : initialData?.role
-          ? String(initialData.role)
-          : undefined,
+    role: initialData?.roleId || initialData?.role?.id || undefined,
     jobTitle: initialData?.jobTitle || '',
     birthDate: initialData?.birthDate ? formatDateForInput(initialData.birthDate) : '',
     primaryPhone: initialData?.primaryPhone || '',

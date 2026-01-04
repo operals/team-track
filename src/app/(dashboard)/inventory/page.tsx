@@ -1,8 +1,7 @@
 import type { Metadata } from 'next'
-import { headers } from 'next/headers'
-import { redirect } from 'next/navigation'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
+import { db } from '@/db'
+import { requireAuth } from '@/lib/auth-guards'
+import { desc } from 'drizzle-orm'
 
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { InventoryList } from '@/components/inventory/inventory-list'
@@ -13,19 +12,15 @@ export const metadata: Metadata = {
 }
 
 export default async function Page() {
-  const payload = await getPayload({ config: configPromise })
+  await requireAuth()
 
-  // Authenticate using the request cookies (same login as /admin)
-  const { user } = await payload.auth({ headers: await headers() })
-  if (!user) redirect('/admin')
-
-  // Fetch inventory docs, include related holder
-  const { docs } = await payload.find({
-    collection: 'inventory',
-    depth: 2, // to resolve holder -> User
-    limit: 50, // adjust or wire to pagination
-    sort: '-updatedAt',
-    user, // ensure access rules apply to this user
+  // Fetch inventory with holder relation
+  const inventory = await db.query.inventoryTable.findMany({
+    orderBy: (inventory, { desc }) => [desc(inventory.updatedAt)],
+    limit: 50,
+    with: {
+      holder: true,
+    },
   })
 
   return (
@@ -35,7 +30,7 @@ export default async function Page() {
         className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
       >
         <div className="space-y-4 p-4 lg:p-6">
-          <InventoryList data={docs as any} />
+          <InventoryList data={inventory as any} />
         </div>
       </TabsContent>
     </Tabs>

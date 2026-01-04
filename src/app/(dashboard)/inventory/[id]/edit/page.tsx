@@ -1,9 +1,12 @@
-import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
+import { db } from '@/db'
+import { requireAuth } from '@/lib/auth-guards'
+import { inventoryTable, usersTable, mediaTable } from '@/db/schema'
 import { InventoryForm } from '@/components/inventory/forms/inventory-form'
 import { SetBreadcrumbLabel } from '@/components/set-breadcrumb-label'
+import { eq, asc } from 'drizzle-orm'
+import { writeFile } from 'fs/promises'
+import { join } from 'path'
 
 interface EditInventoryPageProps {
   params: Promise<{ id: string }>
@@ -11,25 +14,26 @@ interface EditInventoryPageProps {
 
 export default async function EditInventoryPage({ params }: EditInventoryPageProps) {
   const { id } = await params
-  const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
-  if (!user) redirect('/admin')
+  await requireAuth()
 
   try {
-    const item = await payload.findByID({ collection: 'inventory', id, depth: 2, user })
-    const userResult = await payload.find({
-      collection: 'users',
-      limit: 100,
-      sort: 'fullName',
-      user,
+    const item = await db.query.inventoryTable.findFirst({
+      where: eq(inventoryTable.id, id),
+      with: {
+        holder: true,
+      },
     })
+
+    if (!item) {
+      notFound()
+    }
+
+    const users = await db.select().from(usersTable).orderBy(asc(usersTable.fullName))
 
     const handleUpdate = async (formData: FormData) => {
       'use server'
 
-      const payload = await getPayload({ config: configPromise })
-      const { user } = await payload.auth({ headers: await headers() })
-      if (!user) throw new Error('Unauthorized')
+      await requireAuth()
 
       const itemType = String(formData.get('itemType') || '')
       const model = String(formData.get('model') || '')
@@ -42,24 +46,36 @@ export default async function EditInventoryPage({ params }: EditInventoryPagePro
       const notes = String(formData.get('notes') || '')
 
       // Image IDs to keep, coming from the form
-      const keptIds: number[] = (formData.getAll('keepImageIds') as string[])
-        .map((v) => Number(v))
-        .filter((n) => !Number.isNaN(n))
+      const keptIds = (formData.getAll('keepImageIds') as string[]).filter((v) => v)
 
       // Upload new images
       const imageFiles = formData
         .getAll('image')
         .filter((f): f is File => f instanceof File && f.size > 0)
-      const newIds: number[] = []
+      const newIds: string[] = []
+
       for (const file of imageFiles) {
-        const buffer = Buffer.from(await file.arrayBuffer())
-        const upload = await payload.create({
-          collection: 'media',
-          data: { alt: `${itemType || item.itemType} image` },
-          file: { data: buffer, mimetype: file.type, name: file.name, size: file.size },
-          user,
-        })
-        newIds.push(upload.id as number)
+        const bytes = await file.arrayBuffer()
+        const buffer = Buffer.from(bytes)
+
+        const timestamp = Date.now()
+        const fileExtension = file.name.split('.').pop()
+        const filename = `inventory-${timestamp}-${Math.random().toString(36).substring(7)}.${fileExtension}`
+        const filepath = join(process.cwd(), 'public', 'media', filename)
+
+        await writeFile(filepath, buffer)
+
+        const [media] = await db
+          .insert(mediaTable)
+          .values({
+            filename,
+            mimeType: file.type,
+            filesize: file.size,
+            url: `/media/${filename}`,
+          })
+          .returning()
+
+        newIds.push(media.id)
       }
 
       const data: any = {
@@ -67,15 +83,14 @@ export default async function EditInventoryPage({ params }: EditInventoryPagePro
         model,
         serialNumber,
         status,
-        image: [...keptIds, ...newIds],
+        image: JSON.stringify([...keptIds, ...newIds]),
+        updatedAt: new Date().toISOString(),
       }
+
       if (holder && holder.trim() !== '') {
-        const holderId = parseInt(holder)
-        if (!isNaN(holderId)) {
-          data.holder = holderId
-        }
+        data.holderId = holder
       } else {
-        data.holder = null
+        data.holderId = null
       }
       if (purchaseDate) data.purchaseDate = purchaseDate
       else data.purchaseDate = null
@@ -83,7 +98,7 @@ export default async function EditInventoryPage({ params }: EditInventoryPagePro
       else data.warrantyExpiry = null
       data.notes = notes || null
 
-      await payload.update({ collection: 'inventory', id, data, user })
+      await db.update(inventoryTable).set(data).where(eq(inventoryTable.id, id))
       redirect('/inventory')
     }
 
@@ -94,7 +109,7 @@ export default async function EditInventoryPage({ params }: EditInventoryPagePro
           mode="edit"
           initialData={item}
           formAction={handleUpdate}
-          holders={userResult.docs.map((u) => ({ value: String(u.id), label: u.fullName }))}
+          holders={users.map((u) => ({ value: String(u.id), label: u.fullName }))}
         />
       </>
     )

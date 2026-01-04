@@ -1,9 +1,10 @@
-import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
+import { db } from '@/db'
+import { requireAuth } from '@/lib/auth-guards'
+import { leavesTable, usersTable } from '@/db/schema'
 import { LeaveDayForm } from '@/components/leaves/forms/leave-form'
 import { SetBreadcrumbLabel } from '@/components/set-breadcrumb-label'
+import { eq, asc } from 'drizzle-orm'
 
 interface EditLeavePageProps {
   params: Promise<{ id: string }>
@@ -11,25 +12,26 @@ interface EditLeavePageProps {
 
 export default async function EditLeavePage({ params }: EditLeavePageProps) {
   const { id } = await params
-  const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
-  if (!user) redirect('/login')
+  await requireAuth()
 
   try {
-    const leaveItem = await payload.findByID({ collection: 'leave-days', id, depth: 2, user })
-    const userResult = await payload.find({
-      collection: 'users',
-      limit: 100,
-      sort: 'fullName',
-      user,
+    const leaveItem = await db.query.leavesTable.findFirst({
+      where: eq(leavesTable.id, id),
+      with: {
+        user: true,
+      },
     })
+
+    if (!leaveItem) {
+      notFound()
+    }
+
+    const users = await db.select().from(usersTable).orderBy(asc(usersTable.fullName))
 
     const handleUpdate = async (formData: FormData) => {
       'use server'
 
-      const payload = await getPayload({ config: configPromise })
-      const { user } = await payload.auth({ headers: await headers() })
-      if (!user) throw new Error('Unauthorized')
+      await requireAuth()
 
       const userId = String(formData.get('user') || '')
       const type = String(formData.get('type') || '')
@@ -48,19 +50,20 @@ export default async function EditLeavePage({ params }: EditLeavePageProps) {
       }
 
       const data: any = {
-        user: parseInt(userId),
+        userId,
         type,
         startDate,
         endDate,
         totalDays: calculatedDays,
         status,
         reason,
+        updatedAt: new Date().toISOString(),
       }
 
       if (note) data.note = note
       else data.note = null
 
-      await payload.update({ collection: 'leave-days', id, data, user })
+      await db.update(leavesTable).set(data).where(eq(leavesTable.id, id))
       redirect('/leaves')
     }
 
@@ -71,7 +74,7 @@ export default async function EditLeavePage({ params }: EditLeavePageProps) {
           mode="edit"
           initialData={leaveItem}
           formAction={handleUpdate}
-          users={userResult.docs.map((u) => ({ value: String(u.id), label: u.fullName }))}
+          users={users.map((u) => ({ value: String(u.id), label: u.fullName }))}
         />
       </>
     )

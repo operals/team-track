@@ -17,8 +17,8 @@ export default function ApplyPage() {
               Join Our Team
             </h1>
             <p className="mt-4 text-lg text-slate-600 dark:text-slate-400">
-              We're always looking for talented individuals to join our growing team. Fill out the
-              form below to apply.
+              We&apos;re always looking for talented individuals to join our growing team. Fill out
+              the form below to apply.
             </p>
           </div>
 

@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
+import { db } from '@/db'
+import { requireAuth } from '@/lib/auth-guards'
+import { usersTable, payrollSettingsTable, payrollTable } from '@/db/schema'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { eq, and, or, isNull, gt } from 'drizzle-orm'
 
 export const metadata: Metadata = {
   title: 'Generate Payrolls',
@@ -12,116 +13,92 @@ export const metadata: Metadata = {
 }
 
 export default async function GeneratePayrollPage() {
-  const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
-  if (!user) redirect('/login')
+  await requireAuth()
 
   const handleGenerate = async (formData: FormData) => {
     'use server'
 
-    const payload = await getPayload({ config: configPromise })
-    const { user } = await payload.auth({ headers: await headers() })
-    if (!user) throw new Error('Unauthorized')
+    await requireAuth()
 
     const month = String(formData.get('month') || new Date().getMonth() + 1).padStart(2, '0')
     const year = Number(formData.get('year') || new Date().getFullYear())
 
     try {
       // Get all active employees
-      const employees = await payload.find({
-        collection: 'users',
-        where: {
-          and: [{ isActive: { equals: true } }, { isSuperAdmin: { not_equals: true } }],
-        },
+      const employees = await db.query.usersTable.findMany({
+        where: eq(usersTable.isActive, true),
         limit: 100,
-        user,
       })
 
-      console.log(`Found ${employees.docs.length} employees to process`)
+      console.log(`Found ${employees.length} employees to process`)
 
       let created = 0
       let skipped = 0
 
-      for (const employee of employees.docs) {
+      for (const employee of employees) {
         try {
           // Get all active payroll settings for this employee
-          const payrollSettings = await payload.find({
-            collection: 'payroll-settings',
-            where: {
-              and: [
-                { employee: { equals: employee.id } },
-                { isActive: { equals: true } },
-                {
-                  or: [
-                    { 'effectiveDate.endDate': { exists: false } },
-                    { 'effectiveDate.endDate': { greater_than: new Date() } },
-                  ],
-                },
-              ],
-            },
-            user,
+          const payrollSettings = await db.query.payrollSettingsTable.findMany({
+            where: and(
+              eq(payrollSettingsTable.employeeId, employee.id),
+              eq(payrollSettingsTable.isActive, true),
+              or(
+                isNull(payrollSettingsTable.endDate),
+                gt(payrollSettingsTable.endDate, new Date()),
+              ),
+            ),
           })
 
           // Create one payroll record per setting
-          for (const setting of payrollSettings.docs) {
+          for (const setting of payrollSettings) {
             try {
-              // Check if payroll already exists for this specific setting
-              const existing = await payload.find({
-                collection: 'payroll',
-                where: {
-                  and: [
-                    { employee: { equals: employee.id } },
-                    { 'period.month': { equals: month } },
-                    { 'period.year': { equals: year } },
-                    { 'payrollItems.payrollSetting': { equals: setting.id } },
-                  ],
-                },
-                user,
+              // Check if payroll already exists for this employee and period
+              const existing = await db.query.payrollTable.findFirst({
+                where: and(
+                  eq(payrollTable.employeeId, employee.id),
+                  eq(payrollTable.month, month),
+                  eq(payrollTable.year, year),
+                ),
               })
 
-              if (existing.docs.length > 0) {
+              if (existing) {
                 skipped++
                 continue
               }
 
-              // Create separate payroll record for each setting
-              await payload.create({
-                collection: 'payroll',
-                data: {
-                  employee: employee.id,
-                  period: {
-                    month: month as
-                      | '01'
-                      | '02'
-                      | '03'
-                      | '04'
-                      | '05'
-                      | '06'
-                      | '07'
-                      | '08'
-                      | '09'
-                      | '10'
-                      | '11'
-                      | '12',
-                    year,
+              // Create payroll record
+              const amount =
+                typeof setting.amount === 'string' ? parseFloat(setting.amount) : setting.amount
+              await db.insert(payrollTable).values({
+                employeeId: employee.id,
+                month: month as
+                  | '01'
+                  | '02'
+                  | '03'
+                  | '04'
+                  | '05'
+                  | '06'
+                  | '07'
+                  | '08'
+                  | '09'
+                  | '10'
+                  | '11'
+                  | '12',
+                year: year,
+                payrollItems: [
+                  {
+                    payrollSettingId: setting.id,
+                    description: setting.description || `${setting.payrollType} payment`,
+                    payrollType: setting.payrollType,
+                    amount: amount || 0,
+                    paymentType: setting.paymentType,
                   },
-                  payrollItems: [
-                    {
-                      payrollSetting: setting.id,
-                      description: setting.description || `${setting.payrollType} payment`,
-                      payrollType: setting.payrollType,
-                      amount: setting.paymentDetails?.amount || 0,
-                      paymentType: setting.paymentDetails?.paymentType || 'bankTransfer',
-                    },
-                  ],
-                  adjustments: {
-                    bonusAmount: 0,
-                    deductionAmount: 0,
-                    adjustmentNote: '',
-                  },
-                  status: 'generated',
-                },
-                user,
+                ],
+                bonusAmount: '0',
+                deductionAmount: '0',
+                adjustmentNote: null,
+                totalAmount: String(amount || 0),
+                status: 'generated',
               })
 
               created++

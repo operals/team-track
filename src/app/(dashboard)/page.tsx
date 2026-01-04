@@ -17,7 +17,7 @@ export default async function Page() {
     getInventoryStats(),
   ])
 
-  const firstName = user?.fullName?.split(' ')[0] || 'User'
+  const firstName = user?.name?.split(' ')[0] || 'User'
 
   return (
     <div className="flex flex-1 flex-col">
@@ -27,7 +27,9 @@ export default async function Page() {
           <div className="px-4 lg:px-6">
             <div className="mb-6">
               <h1 className="text-3xl font-bold tracking-tight">Welcome back, {firstName}!</h1>
-              <p className="text-muted-foreground">Here's an overview of your team and inventory</p>
+              <p className="text-muted-foreground">
+                Here&apos;s an overview of your team and inventory
+              </p>
             </div>
           </div>
 

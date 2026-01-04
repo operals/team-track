@@ -6,7 +6,11 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
 import { Plus } from 'lucide-react'
-import type { LeaveDay, User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { leavesTable, usersTable } from '@/db/schema'
+
+type LeaveDay = InferSelectModel<typeof leavesTable>
+type User = InferSelectModel<typeof usersTable>
 import { LeaveDayTable } from '@/components/leaves/table'
 
 interface LeaveDayProps {
@@ -34,9 +38,9 @@ export function LeaveDayList({ data }: LeaveDayProps) {
     const q = query.trim().toLowerCase()
     return data.filter((item) => {
       const user =
-        typeof item.user === 'object' && item.user && 'fullName' in item.user
-          ? ((item.user as User).fullName || '').toLowerCase()
-          : String(item.user || '').toLowerCase()
+        typeof item.userId === 'object' && item.userId && 'fullName' in item.userId
+          ? ((item.userId as User).fullName || '').toLowerCase()
+          : String(item.userId || '').toLowerCase()
 
       const itemStatus = String((item as any).status || '').toLowerCase()
       const itemType = String((item as any).type || '').toLowerCase()

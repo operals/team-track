@@ -2,7 +2,13 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { PayrollSetting, User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { payrollSettingsTable, usersTable } from '@/db/schema'
+
+type PayrollSetting = InferSelectModel<typeof payrollSettingsTable> & {
+  employee?: User | null
+}
+type User = InferSelectModel<typeof usersTable>
 import { Badge } from '../../ui/badge'
 import { DataTable } from '../../data-table'
 import { Button } from '../../ui/button'
@@ -24,7 +30,7 @@ interface PayrollSettingsTableProps {
 }
 
 export function PayrollSettingsTable({ data, enablePagination = true }: PayrollSettingsTableProps) {
-  const [deletingSetting, setDeletingSetting] = React.useState<number | null>(null)
+  const [deletingSetting, setDeletingSetting] = React.useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
   const [settingToDelete, setSettingToDelete] = React.useState<PayrollSetting | null>(null)
 
@@ -37,7 +43,7 @@ export function PayrollSettingsTable({ data, enablePagination = true }: PayrollS
     if (!settingToDelete) return
 
     const idToDelete = settingToDelete.id
-    setDeletingSetting(Number(idToDelete))
+    setDeletingSetting(idToDelete)
 
     try {
       const response = await fetch(`/api/payroll-settings/${idToDelete}`, {
@@ -130,16 +136,15 @@ export function PayrollSettingsTable({ data, enablePagination = true }: PayrollS
       key: 'amount' as keyof PayrollSetting,
       header: 'Amount',
       render: (value: unknown, item?: PayrollSetting) => {
-        return <>{formatCurrency(item?.paymentDetails?.amount)}</>
+        const amount = item?.amount ? Number(item.amount) : undefined
+        return <>{formatCurrency(amount)}</>
       },
     },
     {
       key: 'paymentType' as keyof PayrollSetting,
       header: 'Payment Method',
       render: (value: unknown, item: PayrollSetting) => {
-        return (
-          <Badge variant="secondary">{formatPaymentType(item.paymentDetails?.paymentType)}</Badge>
-        )
+        return <Badge variant="secondary">{formatPaymentType(item.paymentType)}</Badge>
       },
     },
     {
@@ -165,7 +170,7 @@ export function PayrollSettingsTable({ data, enablePagination = true }: PayrollS
   ]
 
   const actionColumn = (item: PayrollSetting) => {
-    const isDeleting = deletingSetting === Number(item.id)
+    const isDeleting = deletingSetting === item.id
 
     return (
       <div className="flex gap-2">
@@ -190,10 +195,7 @@ export function PayrollSettingsTable({ data, enablePagination = true }: PayrollS
   return (
     <div className="space-y-4">
       <DataTable<PayrollSetting>
-        data={data.map((item) => ({
-          ...item,
-          id: Number(item.id),
-        }))}
+        data={data}
         columns={columns}
         actionColumn={actionColumn}
         enablePagination={enablePagination}

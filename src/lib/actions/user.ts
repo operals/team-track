@@ -1,27 +1,20 @@
 'use server'
 
-import { headers } from 'next/headers'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
+import { db } from '@/db'
+import { usersTable } from '@/db/schema'
+import { eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
+import { requireAuth } from '@/lib/auth-guards'
 
 export async function updateUserStatus(userId: string, isActive: boolean) {
   try {
-    const payload = await getPayload({ config: configPromise })
-    const { user } = await payload.auth({ headers: await headers() })
+    // Check authentication
+    await requireAuth()
 
-    if (!user) {
-      throw new Error('Unauthorized')
-    }
-
-    await payload.update({
-      collection: 'users',
-      id: userId,
-      data: {
-        isActive,
-      },
-      user,
-    })
+    await db
+      .update(usersTable)
+      .set({ isActive, updatedAt: new Date() })
+      .where(eq(usersTable.id, userId))
 
     // Revalidate the user pages to show updated status
     revalidatePath('/users')

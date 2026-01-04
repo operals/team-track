@@ -1,6 +1,9 @@
 'use client'
 
-import { Applicant } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { applicantsTable } from '@/db/schema'
+
+type Applicant = InferSelectModel<typeof applicantsTable>
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import Link from 'next/link'

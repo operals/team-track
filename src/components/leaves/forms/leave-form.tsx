@@ -10,6 +10,10 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowLeft, Save, X } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
+import type { InferSelectModel } from 'drizzle-orm'
+import { leavesTable } from '@/db/schema'
+
+type LeaveDay = InferSelectModel<typeof leavesTable>
 
 const LeaveDaySchemaBase = z.object({
   user: z.string().min(1, 'User is required'),
@@ -53,7 +57,7 @@ interface LeaveDayFormProps {
   onSubmit?: (data: LeaveDayFormValues) => Promise<any>
   formAction?: (formData: FormData) => Promise<void>
   users: Option[]
-  initialData?: Partial<import('@/payload-types').LeaveDay>
+  initialData?: Partial<LeaveDay>
   showStatusField?: boolean // For admin users only
   lockedUserOption?: Option
   returnHref?: string
@@ -71,11 +75,9 @@ export function LeaveDayForm({
 }: LeaveDayFormProps) {
   const defaultUserValue = React.useMemo(() => {
     if (initialData) {
-      if (typeof initialData.user === 'object' && initialData.user) {
-        return String((initialData.user as any).id)
-      }
-      if (initialData.user) {
-        return String(initialData.user)
+      // initialData has userId field from Drizzle schema
+      if (initialData.userId) {
+        return String(initialData.userId)
       }
     }
     return lockedUserOption?.value ?? ''

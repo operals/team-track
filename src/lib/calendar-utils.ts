@@ -1,5 +1,8 @@
 import type { CalendarEvent } from '@/components/calendar/calendar'
-import type { User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { usersTable } from '@/db/schema/users'
+
+type User = InferSelectModel<typeof usersTable>
 
 /**
  * Calculate age from birthdate

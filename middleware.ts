@@ -8,17 +8,39 @@ const PUBLIC_ROUTES = ['/login', '/apply']
 // Routes that bypass middleware completely
 const BYPASS_ROUTES = ['/_next', '/static', '/favicon.ico', '/media']
 
+// Employee-only routes (restricted access)
+const EMPLOYEE_ROUTES = ['/profile']
+
+// Dashboard routes (admin/manager only)
+const DASHBOARD_ROUTES = [
+  '/',
+  '/users',
+  '/payroll',
+  '/leaves',
+  '/inventory',
+  '/applicants',
+  '/calendar',
+  '/admin',
+]
+
 export default auth((req) => {
   const { pathname } = req.nextUrl
   const isLoggedIn = !!req.auth
+  const user = req.auth?.user
 
-  // Bypass middleware for static assets and API routes
+  // Bypass middleware for static assets
   if (BYPASS_ROUTES.some((route) => pathname.startsWith(route))) {
     return NextResponse.next()
   }
 
   // Allow public routes
   if (PUBLIC_ROUTES.some((route) => pathname === route || pathname.startsWith(route + '/'))) {
+    // If already logged in and accessing login page, redirect to appropriate dashboard
+    if (isLoggedIn && pathname === '/login') {
+      const role = (user as any)?.role?.name
+      const redirectPath = role === 'employee' ? '/profile' : '/'
+      return NextResponse.redirect(new URL(redirectPath, req.url))
+    }
     return NextResponse.next()
   }
 
@@ -27,6 +49,29 @@ export default auth((req) => {
     const loginUrl = new URL('/login', req.url)
     loginUrl.searchParams.set('callbackUrl', pathname)
     return NextResponse.redirect(loginUrl)
+  }
+
+  // Role-based access control
+  const role = (user as any)?.role?.name as 'admin' | 'manager' | 'employee' | undefined
+
+  // Employee trying to access dashboard routes
+  if (role === 'employee') {
+    const isDashboardRoute = DASHBOARD_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(route + '/'),
+    )
+    if (isDashboardRoute) {
+      return NextResponse.redirect(new URL('/profile', req.url))
+    }
+  }
+
+  // Admin/Manager trying to access employee-only routes
+  if (role === 'admin' || role === 'manager') {
+    const isEmployeeRoute = EMPLOYEE_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(route + '/'),
+    )
+    if (isEmployeeRoute) {
+      return NextResponse.redirect(new URL('/', req.url))
+    }
   }
 
   return NextResponse.next()

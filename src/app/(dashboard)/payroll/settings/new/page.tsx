@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
+import { db } from '@/db'
+import { requireAuth } from '@/lib/auth-guards'
+import { usersTable, payrollSettingsTable } from '@/db/schema'
 import { SettingsForm } from '@/components/payroll/forms/settings-form'
 
 export const metadata: Metadata = {
@@ -11,29 +11,18 @@ export const metadata: Metadata = {
 }
 
 export default async function NewPayrollSettingPage() {
-  const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
-  if (!user) redirect('/login')
+  await requireAuth()
 
   // Fetch user options for employee select
-  const userResult = await payload.find({
-    collection: 'users',
+  const users = await db.query.usersTable.findMany({
+    orderBy: (users, { asc }) => [asc(users.fullName)],
     limit: 100,
-    sort: 'fullName',
-    where: {
-      isSuperAdmin: {
-        not_equals: true,
-      },
-    },
-    user,
   })
 
   const handleCreateSetting = async (formData: FormData) => {
     'use server'
 
-    const payload = await getPayload({ config: configPromise })
-    const { user } = await payload.auth({ headers: await headers() })
-    if (!user) throw new Error('Unauthorized')
+    await requireAuth()
 
     const employeeId = String(formData.get('employee') || '')
     const payrollType = String(formData.get('payrollType') || 'primary')
@@ -50,8 +39,8 @@ export default async function NewPayrollSettingPage() {
     const endDate = String(formData.get('endDate') || '')
     const notes = String(formData.get('notes') || '')
 
-    const data: any = {
-      employee: parseInt(employeeId),
+    await db.insert(payrollSettingsTable).values({
+      employeeId,
       payrollType: payrollType as
         | 'primary'
         | 'bonus'
@@ -60,26 +49,20 @@ export default async function NewPayrollSettingPage() {
         | 'allowance'
         | 'other',
       description: description || null,
-      paymentDetails: {
-        amount,
-        paymentType: paymentType as 'bankTransfer' | 'cash' | 'cheque',
-        paymentFrequency: paymentFrequency as 'monthly' | 'quarterly' | 'annual' | 'oneTime',
-      },
+      amount: String(amount),
+      paymentType: paymentType as 'bankTransfer' | 'cash' | 'cheque',
+      paymentFrequency: paymentFrequency as 'monthly' | 'quarterly' | 'annual' | 'oneTime',
       bankAccount: {
-        accountNumber: accountNumber || null,
-        bankName: bankName || null,
-        accountHolderName: accountHolderName || null,
-        swiftCode: swiftCode || null,
+        accountNumber: accountNumber || undefined,
+        bankName: bankName || undefined,
+        accountHolderName: accountHolderName || undefined,
+        swiftCode: swiftCode || undefined,
       },
       isActive,
-      effectiveDate: {
-        startDate,
-        endDate: endDate || null,
-      },
+      startDate: new Date(startDate),
+      endDate: endDate ? new Date(endDate) : null,
       notes: notes || null,
-    }
-
-    await payload.create({ collection: 'payroll-settings', data, user })
+    })
 
     redirect('/payroll/settings')
   }
@@ -89,7 +72,7 @@ export default async function NewPayrollSettingPage() {
       <SettingsForm
         mode="create"
         formAction={handleCreateSetting}
-        employees={userResult.docs.map((u) => ({ value: String(u.id), label: u.fullName }))}
+        employees={users.map((u) => ({ value: String(u.id), label: u.fullName }))}
       />
     </>
   )

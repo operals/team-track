@@ -24,7 +24,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { MultiFileUpload } from '@/components/ui/multi-file-upload'
-import type { User, Media } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { usersTable, mediaTable } from '@/db/schema'
+
+type User = InferSelectModel<typeof usersTable>
+type Media = InferSelectModel<typeof mediaTable>
 import Link from 'next/link'
 
 interface DocumentsCardProps {

@@ -1,9 +1,17 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
+import { db } from '@/db'
 import { getCurrentUser } from '@/lib/auth'
+import { isEmployee } from '@/lib/rbac'
 import { EmployeeProfileView } from '@/components/employee/employee-profile-view'
+import { eq } from 'drizzle-orm'
+import {
+  usersTable,
+  inventoryTable,
+  leavesTable,
+  payrollTable,
+  payrollSettingsTable,
+} from '@/db/schema'
 
 export const metadata: Metadata = {
   title: 'My Profile',
@@ -13,79 +21,67 @@ export const metadata: Metadata = {
 export default async function EmployeeProfilePage() {
   const user = await getCurrentUser()
 
-  if (!user) {
+  if (!user || !user.id) {
     redirect('/login')
   }
 
-  // Determine if user should be restricted to the employee experience
-  const isSuperAdmin = user.isSuperAdmin === true
-  const role =
-    typeof user.role === 'object' && user.role !== null ? (user.role as { level?: string }) : null
-  const roleLevel = role?.level
-  const isManagerOrAdmin = roleLevel === 'admin' || roleLevel === 'manager'
-  const isRestrictedLevel = roleLevel === 'restricted'
-  const isEmployeeLevel = roleLevel === 'employee' || isRestrictedLevel || roleLevel === undefined
-  const isBasicEmployee = !isSuperAdmin && !isManagerOrAdmin && isEmployeeLevel
-
-  // Only basic employees should access this page
-  if (!isBasicEmployee) {
+  // Only employees should access this page - admin/manager go to dashboard
+  if (!isEmployee(user as any)) {
     redirect('/')
   }
 
-  const payload = await getPayload({ config: configPromise })
+  const userId = user.id // Ensure we have a string for TypeScript
 
   // Fetch full user data with relations
-  const userData = await payload.findByID({
-    collection: 'users',
-    id: user.id,
-    depth: 2,
-  })
-
-  // Fetch user's inventory
-  const { docs: inventory } = await payload.find({
-    collection: 'inventory',
-    where: {
-      holder: {
-        equals: user.id,
+  const userData = await db.query.usersTable.findFirst({
+    where: eq(usersTable.id, userId),
+    with: {
+      role: true,
+      departments: {
+        with: {
+          department: true,
+        },
       },
     },
-    depth: 1,
+  })
+
+  if (!userData) {
+    redirect('/login')
+  }
+
+  // Fetch user's inventory
+  const inventory = await db.query.inventoryTable.findMany({
+    where: eq(inventoryTable.holderId, userId),
+    with: {
+      holder: true,
+    },
   })
 
   // Fetch user's leaves
-  const { docs: leaves } = await payload.find({
-    collection: 'leave-days',
-    where: {
-      user: {
-        equals: user.id,
-      },
+  const leaves = await db.query.leavesTable.findMany({
+    where: eq(leavesTable.userId, userId),
+    orderBy: (leaves, { desc }) => [desc(leaves.startDate)],
+    with: {
+      user: true,
     },
-    depth: 1,
-    sort: '-startDate',
   })
 
   // Fetch user's payroll history
-  const { docs: payrollHistory } = await payload.find({
-    collection: 'payroll',
-    where: {
-      employee: {
-        equals: user.id,
-      },
+  const payrollHistory = await db.query.payrollTable.findMany({
+    where: eq(payrollTable.employeeId, userId),
+    orderBy: (payroll, { desc }) => [desc(payroll.createdAt)],
+    with: {
+      employee: true,
+      processedBy: true,
     },
-    depth: 1,
-    sort: '-period.year',
   })
 
   // Fetch user's payroll settings only
-  const { docs: payrollSettings } = await payload.find({
-    collection: 'payroll-settings',
-    where: {
-      employee: {
-        equals: user.id,
-      },
+  const payrollSettings = await db.query.payrollSettingsTable.findMany({
+    where: eq(payrollSettingsTable.employeeId, userId),
+    with: {
+      employee: true,
     },
-    depth: 1,
-    limit: 100,
   })
 
   return (

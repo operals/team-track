@@ -1,6 +1,12 @@
 'use client'
 
-import { Inventory, User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { inventoryTable, usersTable } from '@/db/schema'
+
+type Inventory = InferSelectModel<typeof inventoryTable> & {
+  holder?: User | null
+}
+type User = InferSelectModel<typeof usersTable>
 import { Badge } from '../ui/badge'
 import { DataTable } from '../data-table'
 import { InventoryItemCell } from './item-cell'
@@ -40,9 +46,7 @@ export function InventoryTable({ data, enablePagination = true }: InventoryTable
       header: 'Holder',
       render: (value: unknown, item: Inventory) => {
         const holder = item.holder
-        return typeof holder === 'object' && holder !== null && 'fullName' in holder
-          ? (holder as User).fullName
-          : holder || '-'
+        return holder && typeof holder === 'object' && 'fullName' in holder ? holder.fullName : '-'
       },
     },
     {
@@ -95,10 +99,7 @@ export function InventoryTable({ data, enablePagination = true }: InventoryTable
   return (
     <div className="space-y-4">
       <DataTable<Inventory>
-        data={data.map((item) => ({
-          ...item,
-          id: Number(item.id),
-        }))}
+        data={data as Inventory[]}
         columns={columns}
         actionColumn={actionColumn}
         enablePagination={enablePagination}

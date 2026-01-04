@@ -12,7 +12,13 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
-import type { Inventory, User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { inventoryTable, usersTable } from '@/db/schema'
+
+type Inventory = InferSelectModel<typeof inventoryTable> & {
+  holder?: User | null
+}
+type User = InferSelectModel<typeof usersTable>
 import Link from 'next/link'
 import { updateInventoryInline } from '@/lib/actions/inventory'
 
@@ -23,11 +29,7 @@ interface InventoryDrawerProps {
 export function InventoryDrawer({ item }: InventoryDrawerProps) {
   const [status, setStatus] = React.useState(item.status)
   const [holderId, setHolderId] = React.useState<string>(
-    typeof item.holder === 'object' && item.holder
-      ? String((item.holder as any).id)
-      : item.holder
-        ? String(item.holder)
-        : '',
+    item.holder && typeof item.holder === 'object' ? String(item.holder.id) : item.holderId || '',
   )
   const [holders, setHolders] = React.useState<Array<{ value: string; label: string }>>([])
   const [holderQuery, setHolderQuery] = React.useState('')
@@ -35,8 +37,8 @@ export function InventoryDrawer({ item }: InventoryDrawerProps) {
 
   // Get current holder name for display
   const currentHolderName = React.useMemo(() => {
-    if (typeof item.holder === 'object' && item.holder !== null && 'fullName' in item.holder) {
-      return (item.holder as User).fullName
+    if (item.holder && typeof item.holder === 'object' && 'fullName' in item.holder) {
+      return item.holder.fullName
     }
     // If holderId exists but holder is just an ID, find it in the holders list
     if (holderId && holders.length > 0) {
@@ -186,11 +188,11 @@ export function InventoryDrawer({ item }: InventoryDrawerProps) {
           </div>
         )}
 
-        {Array.isArray(item.image) && item.image.length > 0 && (
+        {Array.isArray(item.images) && item.images.length > 0 && (
           <div>
             <h4 className="text-sm font-medium text-muted-foreground mb-2">Images</h4>
             <div className="grid grid-cols-3 gap-2">
-              {item.image.map((img: any, idx: number) => {
+              {item.images.map((img: any, idx: number) => {
                 const url = typeof img === 'object' && img && 'url' in img ? img.url : undefined
                 return url ? (
                   <img

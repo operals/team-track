@@ -10,6 +10,10 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowLeft, Save, X } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
+import type { InferSelectModel } from 'drizzle-orm'
+import { payrollTable } from '@/db/schema'
+
+type Payroll = InferSelectModel<typeof payrollTable>
 
 const PayrollSchema = z.object({
   employee: z.string().min(1, 'Employee is required'),
@@ -41,7 +45,7 @@ interface PayrollFormProps {
   onSubmit?: (data: PayrollFormValues) => Promise<any>
   formAction?: (formData: FormData) => Promise<void>
   employees: Option[]
-  initialData?: Partial<import('@/payload-types').Payroll>
+  initialData?: Partial<Payroll>
 }
 
 export function PayrollForm({
@@ -61,25 +65,19 @@ export function PayrollForm({
   } = useForm<PayrollFormValues>({
     resolver: zodResolver(PayrollSchema) as any,
     defaultValues: {
-      employee: initialData
-        ? typeof initialData.employee === 'object' && initialData.employee
-          ? String((initialData.employee as any).id)
-          : initialData.employee
-            ? String(initialData.employee)
-            : ''
-        : '',
-      month: (initialData?.period?.month as any) || '01',
-      year: initialData?.period?.year || new Date().getFullYear(),
-      paymentType: (initialData?.payrollItems?.[0] as any)?.paymentType || 'bankTransfer',
-      bonusAmount: initialData?.adjustments?.bonusAmount || 0,
-      deductionAmount: initialData?.adjustments?.deductionAmount || 0,
-      adjustmentNote: initialData?.adjustments?.adjustmentNote || '',
+      employee: initialData?.employeeId || '',
+      month: (initialData?.month as any) || '01',
+      year: initialData?.year || new Date().getFullYear(),
+      paymentType: 'bankTransfer',
+      bonusAmount: initialData?.bonusAmount ? Number(initialData.bonusAmount) : 0,
+      deductionAmount: initialData?.deductionAmount ? Number(initialData.deductionAmount) : 0,
+      adjustmentNote: initialData?.adjustmentNote || '',
       status: (initialData?.status as any) || 'generated',
-      paymentDate: initialData?.paymentDetails?.paymentDate
-        ? new Date(initialData.paymentDetails.paymentDate).toISOString().split('T')[0]
+      paymentDate: initialData?.paymentDate
+        ? new Date(initialData.paymentDate).toISOString().split('T')[0]
         : '',
-      paymentReference: initialData?.paymentDetails?.paymentReference || '',
-      paymentNotes: initialData?.paymentDetails?.paymentNotes || '',
+      paymentReference: initialData?.paymentReference || '',
+      paymentNotes: initialData?.paymentNotes || '',
     },
   })
 

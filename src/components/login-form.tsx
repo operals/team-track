@@ -38,23 +38,10 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
       })
 
       if (response.ok) {
-        const data = await response.json()
-
-        const user = data.user
-        const role =
-          typeof user?.role === 'object' && user?.role !== null ? (user.role as { level?: string }) : null
-        const roleLevel = role?.level
-
-        const isSuperAdmin = user?.isSuperAdmin === true
-        const isManagerOrAdmin = roleLevel === 'admin' || roleLevel === 'manager'
-
-        // Redirect based on user role
-        if (isSuperAdmin || isManagerOrAdmin) {
-          router.push('/') // Dashboard for Super Admins/HR/Managers
-        } else {
-          router.push('/profile') // Profile for basic employees
-        }
-        router.refresh()
+        // Successful login - session will be updated
+        // Use window.location for full page reload to ensure session is fresh
+        window.location.href = '/'
+        return
       } else {
         const data = await response.json()
         setError(data.message || 'Login failed')
@@ -121,7 +108,10 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
                   {loading ? 'Logging in...' : 'Login'}
                 </Button>
                 <FieldDescription className="text-center">
-                  Need an account? <a href="/signup" className="underline hover:text-primary">Sign up here</a>
+                  Need an account?{' '}
+                  <a href="/signup" className="underline hover:text-primary">
+                    Sign up here
+                  </a>
                 </FieldDescription>
               </Field>
             </FieldGroup>

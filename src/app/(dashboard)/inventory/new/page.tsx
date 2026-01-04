@@ -1,9 +1,12 @@
 import type { Metadata } from 'next'
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
+import { db } from '@/db'
+import { requireAuth } from '@/lib/auth-guards'
+import { inventoryTable, usersTable, mediaTable } from '@/db/schema'
 import { InventoryForm } from '@/components/inventory/forms/inventory-form'
+import { asc } from 'drizzle-orm'
+import { writeFile } from 'fs/promises'
+import { join } from 'path'
 
 // Force dynamic rendering - do not generate static page at build time
 export const dynamic = 'force-dynamic'
@@ -15,29 +18,15 @@ export const metadata: Metadata = {
 }
 
 export default async function NewInventoryPage() {
-  const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
-  if (!user) redirect('/login')
+  await requireAuth()
 
   // Fetch user options for holder select
-  const userResult = await payload.find({
-    collection: 'users',
-    limit: 100,
-    sort: 'fullName',
-    where: {
-      isSuperAdmin: {
-        not_equals: true,
-      },
-    },
-    user,
-  })
+  const users = await db.select().from(usersTable).orderBy(asc(usersTable.fullName))
 
   const handleCreateInventory = async (formData: FormData) => {
     'use server'
 
-    const payload = await getPayload({ config: configPromise })
-    const { user } = await payload.auth({ headers: await headers() })
-    if (!user) throw new Error('Unauthorized')
+    await requireAuth()
 
     const itemType = String(formData.get('itemType') || '')
     const model = String(formData.get('model') || '')
@@ -53,16 +42,31 @@ export default async function NewInventoryPage() {
     const imageFiles = formData
       .getAll('image')
       .filter((f): f is File => f instanceof File && f.size > 0)
-    const imageIds: number[] = []
+    const imagePaths: string[] = []
+
     for (const file of imageFiles) {
-      const buffer = Buffer.from(await file.arrayBuffer())
-      const upload = await payload.create({
-        collection: 'media',
-        data: { alt: `${itemType} image` },
-        file: { data: buffer, mimetype: file.type, name: file.name, size: file.size },
-        user,
-      })
-      imageIds.push(upload.id as number)
+      const bytes = await file.arrayBuffer()
+      const buffer = Buffer.from(bytes)
+
+      const timestamp = Date.now()
+      const fileExtension = file.name.split('.').pop()
+      const filename = `inventory-${timestamp}-${Math.random().toString(36).substring(7)}.${fileExtension}`
+      const filepath = join(process.cwd(), 'public', 'media', filename)
+
+      await writeFile(filepath, buffer)
+
+      // Store file metadata in media table
+      const [media] = await db
+        .insert(mediaTable)
+        .values({
+          filename,
+          mimeType: file.type,
+          filesize: file.size,
+          url: `/media/${filename}`,
+        })
+        .returning()
+
+      imagePaths.push(media.id)
     }
 
     const data: any = {
@@ -71,18 +75,16 @@ export default async function NewInventoryPage() {
       serialNumber,
       status,
     }
+
     if (holder && holder.trim() !== '') {
-      const holderId = parseInt(holder)
-      if (!isNaN(holderId)) {
-        data.holder = holderId
-      }
+      data.holderId = holder
     }
     if (purchaseDate) data.purchaseDate = purchaseDate
     if (warrantyExpiry) data.warrantyExpiry = warrantyExpiry
     if (notes) data.notes = notes
-    if (imageIds.length) data.image = imageIds
+    if (imagePaths.length) data.image = JSON.stringify(imagePaths)
 
-    await payload.create({ collection: 'inventory', data, user })
+    await db.insert(inventoryTable).values(data)
 
     redirect('/inventory')
   }
@@ -92,7 +94,7 @@ export default async function NewInventoryPage() {
       <InventoryForm
         mode="create"
         formAction={handleCreateInventory}
-        holders={userResult.docs.map((u) => ({ value: String(u.id), label: u.fullName }))}
+        holders={users.map((u) => ({ value: String(u.id), label: u.fullName }))}
       />
     </>
   )

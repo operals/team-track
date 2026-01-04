@@ -9,7 +9,26 @@ import { Badge } from '@/components/ui/badge'
 import { Plus, X, Filter } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Checkbox } from '@/components/ui/checkbox'
-import type { User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { usersTable } from '@/db/schema'
+
+type User = InferSelectModel<typeof usersTable> & {
+  role?: { id: string; name: string } | null
+  departments?: Array<{
+    id: string
+    userId: string
+    departmentId: string
+    createdAt: Date
+    department: {
+      id: string
+      name: string
+      isActive: boolean
+      createdAt: Date
+      updatedAt: Date
+      description: string | null
+    }
+  }>
+}
 import { UserTable } from '@/components/user/table'
 
 interface UserListProps {
@@ -67,15 +86,13 @@ export function UserList({ data }: UserListProps) {
       // Search filter
       const name = s.fullName?.toLowerCase() || ''
       const dept =
-        (typeof s.departments === 'object' && s.departments && 'name' in s.departments
-          ? (s.departments as any).name
+        Array.isArray(s.departments) && s.departments.length > 0
+          ? s.departments
+              .map((d: any) => d.department?.name || d.name || '')
+              .join(' ')
+              .toLowerCase()
           : ''
-        )?.toLowerCase() || ''
-      const role =
-        (typeof s.role === 'object' && s.role && 'name' in s.role
-          ? (s.role as any).name
-          : ''
-        )?.toLowerCase() || ''
+      const role = s.role?.name?.toLowerCase() || ''
       const email = (s.email || '').toLowerCase()
       if (!q) return true
       return name.includes(q) || dept.includes(q) || role.includes(q) || email.includes(q)

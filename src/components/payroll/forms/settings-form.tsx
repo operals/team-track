@@ -10,6 +10,10 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowLeft, Save, X } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
+import type { InferSelectModel } from 'drizzle-orm'
+import { payrollSettingsTable } from '@/db/schema'
+
+type PayrollSetting = InferSelectModel<typeof payrollSettingsTable>
 
 const SettingsSchemaBase = z.object({
   employee: z.string().min(1, 'Employee is required'),
@@ -86,7 +90,7 @@ interface SettingsFormProps {
   onSubmit?: (data: SettingsFormValues) => Promise<any>
   formAction?: (formData: FormData) => Promise<void>
   employees: Option[]
-  initialData?: Partial<import('@/payload-types').PayrollSetting>
+  initialData?: Partial<PayrollSetting>
 }
 
 export function SettingsForm({
@@ -100,33 +104,28 @@ export function SettingsForm({
     register,
     control,
     handleSubmit,
+    trigger,
     watch,
     formState: { errors, isSubmitting },
   } = useForm<SettingsFormValues>({
     resolver: zodResolver(SettingsSchema) as any,
     defaultValues: {
-      employee: initialData
-        ? typeof initialData.employee === 'object' && initialData.employee
-          ? String((initialData.employee as any).id)
-          : initialData.employee
-            ? String(initialData.employee)
-            : ''
-        : '',
+      employee: initialData?.employeeId || '',
       payrollType: (initialData?.payrollType as any) || 'primary',
       description: initialData?.description || '',
-      amount: (initialData?.paymentDetails as any)?.amount || 0,
-      paymentType: (initialData?.paymentDetails as any)?.paymentType || 'bankTransfer',
-      paymentFrequency: (initialData?.paymentDetails as any)?.paymentFrequency || 'monthly',
+      amount: initialData?.amount ? Number(initialData.amount) : 0,
+      paymentType: (initialData?.paymentType as any) || 'bankTransfer',
+      paymentFrequency: (initialData?.paymentFrequency as any) || 'monthly',
       accountNumber: (initialData?.bankAccount as any)?.accountNumber || '',
       bankName: (initialData?.bankAccount as any)?.bankName || '',
       accountHolderName: (initialData?.bankAccount as any)?.accountHolderName || '',
       swiftCode: (initialData?.bankAccount as any)?.swiftCode || '',
       isActive: initialData?.isActive ?? true,
-      startDate: initialData?.effectiveDate?.startDate
-        ? new Date(initialData.effectiveDate.startDate).toISOString().split('T')[0]
+      startDate: initialData?.startDate
+        ? new Date(initialData.startDate).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0],
-      endDate: initialData?.effectiveDate?.endDate
-        ? new Date(initialData.effectiveDate.endDate).toISOString().split('T')[0]
+      endDate: initialData?.endDate
+        ? new Date(initialData.endDate).toISOString().split('T')[0]
         : '',
       notes: initialData?.notes || '',
     },
@@ -435,7 +434,18 @@ export function SettingsForm({
                 Cancel
               </Button>
             </Link>
-            <Button type="submit" disabled={isSubmitting || nativeSubmitting}>
+            <Button
+              type={formAction ? 'button' : 'submit'}
+              disabled={isSubmitting || nativeSubmitting}
+              onClick={async () => {
+                if (!formAction) return
+                const isValid = await trigger()
+                if (isValid) {
+                  setNativeSubmitting(true)
+                  formRef.current?.requestSubmit()
+                }
+              }}
+            >
               {(isSubmitting || nativeSubmitting) && <Spinner className="mr-2" />}
               <Save className="h-4 w-4 mr-2" />
               {mode === 'create' ? 'Create' : 'Update'}

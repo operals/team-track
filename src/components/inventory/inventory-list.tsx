@@ -6,7 +6,13 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
 import { Plus } from 'lucide-react'
-import type { Inventory, User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { inventoryTable, usersTable } from '@/db/schema'
+
+type Inventory = InferSelectModel<typeof inventoryTable> & {
+  holder?: User | null
+}
+type User = InferSelectModel<typeof usersTable>
 import { InventoryTable } from '@/components/inventory/table'
 
 interface InventoryListProps {
@@ -40,9 +46,9 @@ export function InventoryList({ data }: InventoryListProps) {
       const serial = (item.serialNumber || '').toUpperCase()
       const status = (item.status || '').toUpperCase()
       const holder =
-        typeof item.holder === 'object' && item.holder && 'fullName' in item.holder
-          ? ((item.holder as User).fullName || '').toUpperCase()
-          : String(item.holder || '').toUpperCase()
+        item.holder && typeof item.holder === 'object' && 'fullName' in item.holder
+          ? (item.holder.fullName || '').toUpperCase()
+          : ''
       if (!q) return true
       return (
         type.includes(q) ||

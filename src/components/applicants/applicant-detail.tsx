@@ -32,7 +32,11 @@ import {
 } from 'lucide-react'
 import { formatDate } from '@/lib/date-utils'
 import { toast } from 'sonner'
-import type { Applicant, User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { applicantsTable } from '@/db/schema'
+import type { User } from '@/lib/rbac'
+
+type Applicant = InferSelectModel<typeof applicantsTable>
 import { SetBreadcrumbLabel } from '@/components/set-breadcrumb-label'
 
 interface ApplicantDetailProps {
@@ -150,7 +154,7 @@ export function ApplicantDetail({ applicant, currentUser }: ApplicantDetailProps
               <h1 className="text-2xl font-bold">Applicant Details</h1>
             </div>
           </div>
-          <Link href={`/users/new`} >
+          <Link href={`/users/new`}>
             <Button variant="outline" size="sm">
               Change to Team Member
             </Button>
@@ -166,7 +170,7 @@ export function ApplicantDetail({ applicant, currentUser }: ApplicantDetailProps
                 <CardTitle>Contact Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 flex flex-col">
-                <div className='mb-6'>
+                <div className="mb-6">
                   <h1 className="text-2xl font-bold">{applicant.fullName}</h1>
                   <p className="text-sm text-muted-foreground">{applicant.positionAppliedFor}</p>
                 </div>
@@ -174,23 +178,29 @@ export function ApplicantDetail({ applicant, currentUser }: ApplicantDetailProps
                   <div className="flex items-center gap-2">
                     <Mail className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <span className="text-sm font-medium">Email: <a
-                        href={`mailto:${applicant.email}`}
+                      <span className="text-sm font-medium">
+                        Email:{' '}
+                        <a
+                          href={`mailto:${applicant.email}`}
                           className="text-sm text-primary hover:underline"
                         >
                           {applicant.email}
-                        </a></span>
+                        </a>
+                      </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Phone className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <span className="text-sm font-medium">Phone: <a
-                        href={`tel:${applicant.phone}`}
+                      <span className="text-sm font-medium">
+                        Phone:{' '}
+                        <a
+                          href={`tel:${applicant.phone}`}
                           className="text-sm text-primary hover:underline"
                         >
                           {applicant.phone}
-                        </a></span>
+                        </a>
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -296,7 +306,9 @@ export function ApplicantDetail({ applicant, currentUser }: ApplicantDetailProps
                   <>
                     <Separator />
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Expected Monthly Salary</p>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Expected Monthly Salary
+                      </p>
                       <p className="text-sm font-semibold">
                         ₺{app.expectedSalary.toLocaleString()}
                       </p>
@@ -360,7 +372,7 @@ export function ApplicantDetail({ applicant, currentUser }: ApplicantDetailProps
                       <div>
                         <p className="font-medium">CV Document</p>
                         <p className="text-sm text-muted-foreground">
-                          View or download the applicant's resume
+                          View or download the applicant&apos;s resume
                         </p>
                       </div>
                     </div>

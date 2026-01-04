@@ -1,13 +1,10 @@
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
-
+import { db } from '@/db'
+import { leavesTable } from '@/db/schema'
 import { getCurrentUser } from '@/lib/auth'
+import { hasFullAccess } from '@/lib/rbac'
 import { LeaveDayForm } from '@/components/leaves/forms/leave-form'
-
-const isAdminLevel = (roleLevel: string | undefined | null) =>
-  roleLevel === 'admin' || roleLevel === 'manager'
+import { requireAuth } from '@/lib/auth-guards'
 
 export default async function EmployeeCreateLeavePage() {
   const user = await getCurrentUser()
@@ -16,27 +13,20 @@ export default async function EmployeeCreateLeavePage() {
     redirect('/login')
   }
 
-  const role =
-    typeof user.role === 'object' && user.role !== null ? (user.role as { level?: string }) : null
-  const roleLevel = role?.level
-
-  if (user.isSuperAdmin === true || isAdminLevel(roleLevel)) {
+  // Admin and manager should use the main leaves page
+  if (hasFullAccess(user as any)) {
     redirect('/leaves')
   }
 
   const requesterOption = {
     value: String(user.id),
-    label: user.fullName || user.email || 'Current User',
+    label: user.name || user.email || 'Current User',
   }
 
   const handleCreateLeave = async (formData: FormData) => {
     'use server'
 
-    const payload = await getPayload({ config: configPromise })
-    const { user: authUser } = await payload.auth({ headers: await headers() })
-    if (!authUser) {
-      throw new Error('Unauthorized')
-    }
+    const user = await requireAuth()
 
     const type = String(formData.get('type') || '')
     const startDate = String(formData.get('startDate') || '')
@@ -52,7 +42,7 @@ export default async function EmployeeCreateLeavePage() {
     }
 
     const data: any = {
-      user: Number(authUser.id),
+      userId: user.id,
       type,
       startDate,
       endDate,
@@ -65,11 +55,7 @@ export default async function EmployeeCreateLeavePage() {
       data.note = note
     }
 
-    await payload.create({
-      collection: 'leave-days',
-      data,
-      user: authUser,
-    })
+    await db.insert(leavesTable).values(data)
 
     redirect('/profile')
   }

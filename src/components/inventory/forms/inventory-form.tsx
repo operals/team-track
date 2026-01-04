@@ -42,6 +42,8 @@ const InventorySchema = InventorySchemaBase.superRefine((val, ctx) => {
 })
 
 export type InventoryFormValues = z.infer<typeof InventorySchema>
+import type { InferSelectModel } from 'drizzle-orm'
+import { inventoryTable } from '@/db/schema/inventory'
 
 interface Option {
   value: string
@@ -53,7 +55,7 @@ interface InventoryFormProps {
   onSubmit?: (data: InventoryFormValues) => Promise<any>
   formAction?: (formData: FormData) => Promise<void>
   holders: Option[]
-  initialData?: Partial<import('@/payload-types').Inventory>
+  initialData?: Partial<InferSelectModel<typeof inventoryTable>>
 }
 
 export function InventoryForm({
@@ -94,8 +96,8 @@ export function InventoryForm({
   const [existingImages, setExistingImages] = React.useState<
     Array<{ id: number; url?: string; keep: boolean }>
   >(() => {
-    if (mode !== 'edit' || !initialData?.image) return []
-    const arr = Array.isArray(initialData.image) ? initialData.image : []
+    if (mode !== 'edit' || !initialData?.images) return []
+    const arr = Array.isArray(initialData.images) ? initialData.images : []
     return arr
       .map((img: any) => ({
         id: typeof img === 'object' && img ? Number(img.id) : Number(img),

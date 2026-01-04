@@ -4,7 +4,26 @@ import * as React from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader } from '@/components/ui/card'
-import type { User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { usersTable } from '@/db/schema'
+
+type User = InferSelectModel<typeof usersTable> & {
+  role?: { id: string; name: string } | null
+  departments?: Array<{
+    id: string
+    userId: string
+    departmentId: string
+    createdAt: Date
+    department: {
+      id: string
+      name: string
+      isActive: boolean
+      createdAt: Date
+      updatedAt: Date
+      description: string | null
+    }
+  }>
+}
 import { formatDate } from '@/lib/date-utils'
 import { CalendarDays } from 'lucide-react'
 
@@ -23,25 +42,19 @@ export function ProfileCard({ user }: ProfileCardProps) {
 
   const departments =
     Array.isArray(user.departments) && user.departments.length > 0
-      ? user.departments.map((dept) => (typeof dept === 'object' ? dept.name : dept))
+      ? user.departments.map(
+          (dept: any) => dept.department?.name || dept.name || 'Unknown department',
+        )
       : ['No department']
 
-  const role =
-    typeof user.role === 'object' && user.role && 'name' in user.role
-      ? (user.role as { name: string }).name
-      : user.role || 'No role'
-
-  const photo =
-    typeof user.photo === 'object' && user.photo && 'url' in user.photo
-      ? (user.photo as { url: string }).url
-      : ''
+  const role = user.role?.name || 'No role'
 
   return (
     <Card>
       <CardHeader>
         <div className="flex flex-col items-start md:flex-row md:space-x-6">
           <Avatar className="h-20 w-20">
-            <AvatarImage src={photo} alt={user.fullName} className="object-cover" />
+            <AvatarImage src={user.photo || ''} alt={user.fullName} className="object-cover" />
             <AvatarFallback className="text-xl">{getInitials(user.fullName)}</AvatarFallback>
           </Avatar>
           <div className="flex-1">
@@ -69,7 +82,7 @@ export function ProfileCard({ user }: ProfileCardProps) {
           </div>
           <div className="flex-1">
             <div className="flex items-center space-x-4 mt-3">
-              <div className='text-sm'>
+              <div className="text-sm">
                 <span className="text-muted-foreground">Status: </span>
                 <Badge variant={user.isActive ? 'default' : 'secondary'}>
                   {user.isActive ? 'Active' : 'Inactive'}
@@ -86,8 +99,9 @@ export function ProfileCard({ user }: ProfileCardProps) {
               <div className="text-sm">
                 <span className="text-muted-foreground">Birth Date:</span>
                 <span className="font-medium">
-                <CalendarDays className="inline-block ml-2 mr-1 h-4 w-4 text-muted-foreground" />
-                {formatDate(user.birthDate)}</span>
+                  <CalendarDays className="inline-block ml-2 mr-1 h-4 w-4 text-muted-foreground" />
+                  {formatDate(user.birthDate)}
+                </span>
               </div>
             </div>
           </div>

@@ -1,18 +1,18 @@
-import { pgTable, text, varchar, timestamp, json } from 'drizzle-orm/pg-core'
+import { pgTable, text, varchar, timestamp } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { usersTable } from './users'
 
 // ============================================
-// Role Table
+// Role Table (Stage 1: Simple RBAC)
 // ============================================
 
 export const rolesTable = pgTable('roles', {
   id: text('id')
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  name: varchar('name', { length: 255 }).notNull().unique(),
+  name: varchar('name', { length: 50 }).notNull().unique(), // 'admin', 'manager', 'employee'
+  displayName: varchar('display_name', { length: 100 }).notNull(), // 'Administrator', 'Manager', 'Employee'
   description: text('description'),
-  permissions: json('permissions').$type<Record<string, any>>().notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })

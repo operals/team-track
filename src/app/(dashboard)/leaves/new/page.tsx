@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
+import { db } from '@/db'
+import { requireAuth } from '@/lib/auth-guards'
+import { leavesTable, usersTable } from '@/db/schema'
 import { LeaveDayForm } from '@/components/leaves/forms/leave-form'
+import { asc } from 'drizzle-orm'
 
 export const metadata: Metadata = {
   title: 'New Leave Request',
@@ -11,29 +12,15 @@ export const metadata: Metadata = {
 }
 
 export default async function NewLeavePage() {
-  const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
-  if (!user) redirect('/login')
+  await requireAuth()
 
   // Fetch user options for user select
-  const userResult = await payload.find({
-    collection: 'users',
-    limit: 100,
-    sort: 'fullName',
-    where: {
-      isSuperAdmin: {
-        not_equals: true,
-      },
-    },
-    user,
-  })
+  const users = await db.select().from(usersTable).orderBy(asc(usersTable.fullName))
 
   const handleCreateLeave = async (formData: FormData) => {
     'use server'
 
-    const payload = await getPayload({ config: configPromise })
-    const { user } = await payload.auth({ headers: await headers() })
-    if (!user) throw new Error('Unauthorized')
+    await requireAuth()
 
     const userId = String(formData.get('user') || '')
     const type = String(formData.get('type') || '')
@@ -52,7 +39,7 @@ export default async function NewLeavePage() {
     }
 
     const data: any = {
-      user: parseInt(userId),
+      userId,
       type,
       startDate,
       endDate,
@@ -63,7 +50,7 @@ export default async function NewLeavePage() {
 
     if (note) data.note = note
 
-    await payload.create({ collection: 'leave-days', data, user })
+    await db.insert(leavesTable).values(data)
 
     redirect('/leaves')
   }
@@ -73,7 +60,7 @@ export default async function NewLeavePage() {
       <LeaveDayForm
         mode="create"
         formAction={handleCreateLeave}
-        users={userResult.docs.map((u) => ({ value: String(u.id), label: u.fullName }))}
+        users={users.map((u) => ({ value: String(u.id), label: u.fullName }))}
         showStatusField={false} // Regular users can't set status - always starts as "requested"
       />
     </>

@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
+import { db } from '@/db'
+import { requireAuth } from '@/lib/auth-guards'
 import { UserForm } from '@/components/user/forms/user-form'
+import { asc, eq } from 'drizzle-orm'
+import { departmentsTable, rolesTable, usersTable, userDepartmentsTable } from '@/db/schema'
 
 export const metadata: Metadata = {
   title: 'New User',
@@ -11,58 +12,40 @@ export const metadata: Metadata = {
 }
 
 export default async function NewUserPage() {
-  const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
-  if (!user) redirect('/admin')
+  await requireAuth()
 
   // Fetch departments and roles for dropdowns
-  const [departmentsResult, rolesResult] = await Promise.all([
-    payload.find({
-      collection: 'departments',
-      limit: 100,
-      sort: 'name',
-      user,
-    }),
-    payload.find({
-      collection: 'roles',
-      limit: 100,
-      sort: 'name',
-      user,
-    }),
+  const [departments, roles] = await Promise.all([
+    db.select().from(departmentsTable).orderBy(asc(departmentsTable.name)),
+    db.select().from(rolesTable).orderBy(asc(rolesTable.name)),
   ])
 
   const handleCreateUser = async (formData: FormData) => {
     'use server'
 
-    const payload = await getPayload({ config: configPromise })
-    const { user } = await payload.auth({ headers: await headers() })
+    await requireAuth()
 
-    if (!user) {
-      throw new Error('Unauthorized')
-    }
-
-    // Handle photo upload if file is provided
-    let photoId: number | null = null
+    // Handle photo upload via API if file is provided
+    let photoPath: string | null = null
     const photo = formData.get('photo') as File | null
     const fullName = String(formData.get('fullName') || '')
     if (photo && typeof photo === 'object' && 'arrayBuffer' in photo && photo.size > 0) {
-      const arrayBuffer = await photo.arrayBuffer()
-      const buffer = Buffer.from(arrayBuffer)
+      // Use the upload API endpoint
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', photo)
 
-      const uploadResult = await payload.create({
-        collection: 'media',
-        data: {
-          alt: `${fullName} profile photo`,
+      const uploadRes = await fetch(
+        `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/api/upload`,
+        {
+          method: 'POST',
+          body: uploadFormData,
         },
-        file: {
-          data: buffer,
-          mimetype: photo.type,
-          name: photo.name,
-          size: photo.size,
-        },
-        user,
-      })
-      photoId = uploadResult.id as number
+      )
+
+      if (uploadRes.ok) {
+        const { url } = await uploadRes.json()
+        photoPath = url
+      }
     }
 
     // Auth fields
@@ -82,7 +65,7 @@ export default async function NewUserPage() {
     // Create the new user (team member)
     const userData: any = {
       fullName,
-      ...(photoId && { photo: photoId }),
+      ...(photoPath && { photo: photoPath }),
       birthDate: String(formData.get('birthDate') || ''),
       primaryPhone: String(formData.get('primaryPhone') || ''),
       joinedAt: String(formData.get('joinedAt') || new Date().toISOString()),
@@ -103,47 +86,42 @@ export default async function NewUserPage() {
     if (secondaryPhone) userData.secondaryPhone = secondaryPhone
     if (secondaryEmail) userData.secondaryEmail = secondaryEmail
 
-    // Handle departments array (multi-select)
-    const departmentIds: number[] = []
+    // Handle departments array (multi-select) - will insert into junction table
+    const departmentIds: string[] = []
     let index = 0
     while (formData.has(`departments[${index}]`)) {
       const deptId = String(formData.get(`departments[${index}]`))
-      if (deptId) departmentIds.push(parseInt(deptId))
+      if (deptId) departmentIds.push(deptId)
       index++
     }
-    if (departmentIds.length > 0) userData.departments = departmentIds
 
-    // Convert role string ID to number if value provided
-    const role = String(formData.get('role') || '')
-    if (role) userData.role = parseInt(role)
+    // Convert role string ID if value provided
+    const roleId = String(formData.get('role') || '')
 
-    // Handle documents upload (multi-file)
-    const documentIds: number[] = []
+    // Handle documents upload (multi-file) via API
+    const documentPaths: string[] = []
     let docIndex = 0
     while (formData.has(`documents[${docIndex}]`)) {
       const doc = formData.get(`documents[${docIndex}]`) as File | null
       if (doc && typeof doc === 'object' && 'arrayBuffer' in doc && doc.size > 0) {
-        const arrayBuffer = await doc.arrayBuffer()
-        const buffer = Buffer.from(arrayBuffer)
+        const uploadFormData = new FormData()
+        uploadFormData.append('file', doc)
 
-        const uploadResult = await payload.create({
-          collection: 'media',
-          data: {
-            alt: `${fullName} - ${doc.name}`,
+        const uploadRes = await fetch(
+          `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/api/upload`,
+          {
+            method: 'POST',
+            body: uploadFormData,
           },
-          file: {
-            data: buffer,
-            mimetype: doc.type,
-            name: doc.name,
-            size: doc.size,
-          },
-          user,
-        })
-        documentIds.push(uploadResult.id as number)
+        )
+
+        if (uploadRes.ok) {
+          const { url } = await uploadRes.json()
+          documentPaths.push(url)
+        }
       }
       docIndex++
     }
-    if (documentIds.length > 0) userData.documents = documentIds
 
     // Employment fields
     const baseSalary = formData.get('baseSalary')
@@ -157,11 +135,31 @@ export default async function NewUserPage() {
       }
     }
 
-    const newUser = await payload.create({
-      collection: 'users',
-      data: userData,
-      user,
-    })
+    // Hash password with bcryptjs
+    const bcrypt = await import('bcryptjs')
+    const hashedPassword = await bcrypt.hash(password, 10)
+    userData.password = hashedPassword
+
+    // Set role if provided
+    if (roleId) userData.roleId = roleId
+
+    // Set documents if any uploaded
+    if (documentPaths.length > 0) {
+      userData.documents = JSON.stringify(documentPaths)
+    }
+
+    // Create user in database
+    const [newUser] = await db.insert(usersTable).values(userData).returning()
+
+    // Insert department assignments into junction table
+    if (departmentIds.length > 0 && newUser.id) {
+      await db.insert(userDepartmentsTable).values(
+        departmentIds.map((deptId) => ({
+          userId: newUser.id,
+          departmentId: deptId,
+        })),
+      )
+    }
 
     // Redirect to the new staff member's profile
     redirect(`/users/${newUser.id}`)
@@ -172,11 +170,11 @@ export default async function NewUserPage() {
       <UserForm
         mode="create"
         formAction={handleCreateUser}
-        departments={departmentsResult.docs.map((dept) => ({
+        departments={departments.map((dept) => ({
           value: String(dept.id),
           label: dept.name,
         }))}
-        roles={rolesResult.docs.map((role) => ({ value: String(role.id), label: role.name }))}
+        roles={roles.map((role) => ({ value: String(role.id), label: role.displayName }))}
       />
     </>
   )

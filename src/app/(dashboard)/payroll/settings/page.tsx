@@ -1,9 +1,6 @@
 import type { Metadata } from 'next'
-import { headers } from 'next/headers'
-import { redirect } from 'next/navigation'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
-import type { PayrollSetting } from '@/payload-types'
+import { db } from '@/db'
+import { requireAuth } from '@/lib/auth-guards'
 
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { PayrollSettingsList } from '@/components/payroll/settings/payroll-settings-list'
@@ -14,19 +11,15 @@ export const metadata: Metadata = {
 }
 
 export default async function PayrollSettingsPage() {
-  const payload = await getPayload({ config: configPromise })
+  await requireAuth()
 
-  // Authenticate using the request cookies
-  const { user } = await payload.auth({ headers: await headers() })
-  if (!user) redirect('/login')
-
-  // Fetch payroll settings, include related employee
-  const { docs } = await payload.find({
-    collection: 'payroll-settings',
-    depth: 2, // to resolve employee -> User
-    limit: 1000, // settings are typically fewer than payroll records
-    sort: '-createdAt',
-    user, // ensure access rules apply to this user
+  // Fetch payroll settings with employee relation
+  const payrollSettings = await db.query.payrollSettingsTable.findMany({
+    orderBy: (settings, { desc }) => [desc(settings.createdAt)],
+    limit: 1000,
+    with: {
+      employee: true,
+    },
   })
 
   return (
@@ -36,7 +29,7 @@ export default async function PayrollSettingsPage() {
         className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
       >
         <div className="space-y-4 p-4 lg:p-6">
-          <PayrollSettingsList data={docs as PayrollSetting[]} />
+          <PayrollSettingsList data={payrollSettings as any} />
         </div>
       </TabsContent>
     </Tabs>

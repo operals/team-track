@@ -1,7 +1,8 @@
-import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
+import { db } from '@/db'
+import { requireAuth } from '@/lib/auth-guards'
+import { usersTable, payrollTable } from '@/db/schema'
+import { eq } from 'drizzle-orm'
 import { PayrollForm } from '@/components/payroll/forms/payroll-form'
 import { SetBreadcrumbLabel } from '@/components/set-breadcrumb-label'
 
@@ -11,35 +12,36 @@ interface EditPayrollPageProps {
 
 export default async function EditPayrollPage({ params }: EditPayrollPageProps) {
   const { id } = await params
-  const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
-  if (!user) redirect('/admin')
+  await requireAuth()
 
   try {
-    const payrollItem = await payload.findByID({ collection: 'payroll', id, depth: 2, user })
-    const userResult = await payload.find({
-      collection: 'users',
+    const payrollItem = await db.query.payrollTable.findFirst({
+      where: eq(payrollTable.id, id),
+      with: {
+        employee: true,
+      },
+    })
+
+    if (!payrollItem) {
+      notFound()
+    }
+
+    const users = await db.query.usersTable.findMany({
+      orderBy: (users, { asc }) => [asc(users.fullName)],
       limit: 100,
-      sort: 'fullName',
-      user,
     })
 
     // Prepare employees list before passing to client component
-    const employeeOptions = userResult.docs.map((u) => ({
+    const employeeOptions = users.map((u) => ({
       value: String(u.id),
       label: u.fullName,
     }))
 
-    const employeeName =
-      typeof payrollItem.employee === 'object' && payrollItem.employee
-        ? (payrollItem.employee as any).fullName
-        : 'Payroll'
+    const employeeName = payrollItem.employee?.fullName || 'Payroll'
 
     return (
       <>
-        <SetBreadcrumbLabel
-          label={`${employeeName} - ${payrollItem.period?.month}/${payrollItem.period?.year}`}
-        />
+        <SetBreadcrumbLabel label={`${employeeName} - ${payrollItem.month}/${payrollItem.year}`} />
         <PayrollForm
           mode="edit"
           initialData={payrollItem}
@@ -56,9 +58,7 @@ export default async function EditPayrollPage({ params }: EditPayrollPageProps) 
 async function handleUpdate(payrollId: string, formData: FormData) {
   'use server'
 
-  const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
-  if (!user) throw new Error('Unauthorized')
+  await requireAuth()
 
   const employeeId = String(formData.get('employee') || '')
   const month = String(formData.get('month') || '')
@@ -73,11 +73,31 @@ async function handleUpdate(payrollId: string, formData: FormData) {
   const paymentNotes = String(formData.get('paymentNotes') || '')
 
   // Fetch the current payroll item to get existing payroll items
-  const currentPayroll = await payload.findByID({ collection: 'payroll', id: payrollId, user })
+  const currentPayroll = await db.query.payrollTable.findFirst({
+    where: eq(payrollTable.id, payrollId),
+  })
 
-  const data: any = {
-    employee: parseInt(employeeId),
-    period: {
+  if (!currentPayroll) {
+    throw new Error('Payroll not found')
+  }
+
+  // Parse existing payroll items
+  const existingItems = currentPayroll.payrollItems || []
+
+  // Update payment type in all items
+  const updatedItems = existingItems.map((item: any) => ({
+    ...item,
+    paymentType: paymentType as 'bankTransfer' | 'cash',
+  }))
+
+  // Calculate total amount
+  const itemsTotal = updatedItems.reduce((sum: number, item: any) => sum + (item.amount || 0), 0)
+  const totalAmount = itemsTotal + bonusAmount - deductionAmount
+
+  await db
+    .update(payrollTable)
+    .set({
+      employeeId,
       month: month as
         | '01'
         | '02'
@@ -91,26 +111,23 @@ async function handleUpdate(payrollId: string, formData: FormData) {
         | '10'
         | '11'
         | '12',
-      year,
-    },
-    payrollItems:
-      currentPayroll.payrollItems?.map((item: any) => ({
-        ...item,
-        paymentType: paymentType as 'bankTransfer' | 'cash',
-      })) || [],
-    adjustments: {
-      bonusAmount,
-      deductionAmount,
+      year: year,
+      payrollItems: updatedItems,
+      bonusAmount: String(bonusAmount),
+      deductionAmount: String(deductionAmount),
       adjustmentNote: adjustmentNote || null,
-    },
-    paymentDetails: {
-      paymentDate: paymentDate || null,
+      totalAmount: String(totalAmount),
+      paymentDate: paymentDate ? new Date(paymentDate) : null,
       paymentReference: paymentReference || null,
       paymentNotes: paymentNotes || null,
-    },
-    status,
-  }
+      status: (status === 'rejected' ? 'cancelled' : status) as
+        | 'generated'
+        | 'approved'
+        | 'paid'
+        | 'cancelled',
+      updatedAt: new Date(),
+    })
+    .where(eq(payrollTable.id, payrollId))
 
-  await payload.update({ collection: 'payroll', id: payrollId, data, user })
   redirect('/payroll')
 }

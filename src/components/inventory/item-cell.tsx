@@ -9,7 +9,10 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { Inventory } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { inventoryTable } from '@/db/schema'
+
+type Inventory = InferSelectModel<typeof inventoryTable>
 import { InventoryDrawer } from './drawer'
 
 interface InventoryItemCellProps {

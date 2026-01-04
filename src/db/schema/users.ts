@@ -48,8 +48,7 @@ export const usersTable = pgTable('users', {
   identityNumber: varchar('identity_number', { length: 100 }),
   workPermitExpiry: timestamp('work_permit_expiry'),
 
-  // Status & Permissions
-  isSuperAdmin: boolean('is_super_admin').default(false).notNull(),
+  // Status
   isActive: boolean('is_active').default(true).notNull(),
 
   // Relations

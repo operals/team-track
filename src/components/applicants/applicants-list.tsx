@@ -9,7 +9,10 @@ import { Badge } from '@/components/ui/badge'
 import { Filter } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Checkbox } from '@/components/ui/checkbox'
-import type { Applicant } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { applicantsTable } from '@/db/schema'
+
+type Applicant = InferSelectModel<typeof applicantsTable>
 import { ApplicantsTable } from './applicants-table'
 
 interface ApplicantsListProps {

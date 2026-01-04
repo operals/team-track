@@ -28,17 +28,14 @@ export const metadata: Metadata = {
   manifest: '/favicon/site.webmanifest',
 }
 
+import { hasFullAccess } from '@/lib/rbac'
+
 export default async function DashboardLayout(props: { children: React.ReactNode }) {
   // This will redirect to /login if user is not authenticated
   const user = await requireAuth()
 
-  const role =
-    typeof user?.role === 'object' && user.role !== null ? (user.role as { level?: string }) : null
-  const roleLevel = role?.level
-  const isSuperAdmin = user?.isSuperAdmin === true
-  const isManagerOrAdmin = roleLevel === 'admin' || roleLevel === 'manager'
-
-  if (!isSuperAdmin && !isManagerOrAdmin) {
+  // Only admin and manager have full access to dashboard
+  if (!hasFullAccess(user as any)) {
     redirect('/profile')
   }
 

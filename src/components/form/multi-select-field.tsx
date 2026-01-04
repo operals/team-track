@@ -48,12 +48,10 @@ export function MultiSelectField<TFieldValues extends FieldValues>({
         render={({ field }) => {
           const selectedValues = (field.value as string[]) || []
 
-          const filteredOptions = React.useMemo(() => {
-            if (!searchQuery) return options
-            return options.filter((option) =>
-              option.label.toLowerCase().includes(searchQuery.toLowerCase()),
-            )
-          }, [searchQuery])
+          const filteredOptions = options.filter(
+            (option) =>
+              !searchQuery || option.label.toLowerCase().includes(searchQuery.toLowerCase()),
+          )
 
           const handleSelect = (value: string) => {
             const newValues = selectedValues.includes(value)

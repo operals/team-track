@@ -9,7 +9,20 @@ import { InfoCard } from './info-card'
 import { PayrollCard } from './payroll-card'
 import { UserStatusToggle } from './status-toggle'
 import { updateUserStatus } from '@/lib/actions/user'
-import type { User, Inventory, LeaveDay, Payroll, PayrollSetting } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import {
+  usersTable,
+  inventoryTable,
+  leavesTable,
+  payrollTable,
+  payrollSettingsTable,
+} from '@/db/schema'
+
+type User = InferSelectModel<typeof usersTable>
+type Inventory = InferSelectModel<typeof inventoryTable>
+type LeaveDay = InferSelectModel<typeof leavesTable>
+type Payroll = InferSelectModel<typeof payrollTable>
+type PayrollSetting = InferSelectModel<typeof payrollSettingsTable>
 import { Card, CardContent } from '../ui/card'
 import { SetBreadcrumbLabel } from '@/components/set-breadcrumb-label'
 import { InventoryCard } from './inventory-card'

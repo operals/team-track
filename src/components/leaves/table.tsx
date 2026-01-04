@@ -1,7 +1,11 @@
 'use client'
 
 import * as React from 'react'
-import { LeaveDay, User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { leavesTable, usersTable } from '@/db/schema'
+
+type LeaveDay = InferSelectModel<typeof leavesTable>
+type User = InferSelectModel<typeof usersTable>
 import { Badge } from '../ui/badge'
 import { DataTable } from '../data-table'
 import { Button } from '../ui/button'
@@ -75,7 +79,7 @@ export function LeaveDayTable({ data, enablePagination = true }: LeaveDayTablePr
       key: 'user' as keyof LeaveDay,
       header: 'Applicant',
       render: (value: unknown, item: LeaveDay) => {
-        const user = item.user
+        const user = item.userId
         return typeof user === 'object' && user !== null && 'fullName' in user
           ? (user as User).fullName
           : user || '-'
@@ -178,10 +182,7 @@ export function LeaveDayTable({ data, enablePagination = true }: LeaveDayTablePr
   return (
     <div className="space-y-4">
       <DataTable<LeaveDay>
-        data={data.map((item) => ({
-          ...item,
-          id: Number(item.id),
-        }))}
+        data={data as LeaveDay[]}
         columns={columns}
         actionColumn={actionColumn}
         enablePagination={enablePagination}

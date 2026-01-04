@@ -1,17 +1,18 @@
-import { pgTable, text, varchar, timestamp } from 'drizzle-orm/pg-core'
+import { pgTable, text, varchar, timestamp, boolean } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { usersTable } from './users'
 
 // ============================================
-// Department Table
+// Department Table (Stage 1: Simple Categories)
 // ============================================
 
 export const departmentsTable = pgTable('departments', {
   id: text('id')
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  name: varchar('name', { length: 255 }).notNull().unique(),
+  name: varchar('name', { length: 100 }).notNull().unique(),
   description: text('description'),
+  isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })

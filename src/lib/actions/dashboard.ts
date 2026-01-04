@@ -1,9 +1,9 @@
 'use server'
 
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
-import { headers } from 'next/headers'
-import type { User, Inventory } from '@/payload-types'
+import { db } from '@/db'
+import { usersTable, inventoryTable } from '@/db/schema'
+import { eq, count, and } from 'drizzle-orm'
+import { requireAuth } from '@/lib/auth-guards'
 
 export interface UserStats {
   total: number
@@ -29,27 +29,20 @@ export interface InventoryStats {
 }
 
 export async function getUserStats(): Promise<UserStats> {
-  const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
+  // Check authentication
+  await requireAuth()
 
-  if (!user) {
-    throw new Error('Unauthorized')
-  }
+  // Count total users
+  const [totalResult] = await db.select({ count: count() }).from(usersTable)
 
-  // Fetch all users (team) - Exclude super admins
-  const allUsers = await payload.find({
-    collection: 'users',
-    limit: 1000, // Adjust based on your expected user count
-    where: {
-      isSuperAdmin: {
-        not_equals: true,
-      },
-    },
-    user,
-  })
+  // Count active users
+  const [activeResult] = await db
+    .select({ count: count() })
+    .from(usersTable)
+    .where(eq(usersTable.isActive, true))
 
-  const total = allUsers.docs.length
-  const active = allUsers.docs.filter((user: User) => user.isActive).length
+  const total = totalResult.count
+  const active = activeResult.count
   const inactive = total - active
 
   return {
@@ -60,21 +53,13 @@ export async function getUserStats(): Promise<UserStats> {
 }
 
 export async function getInventoryStats(): Promise<InventoryStats> {
-  const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
+  // Check authentication
+  await requireAuth()
 
-  if (!user) {
-    throw new Error('Unauthorized')
-  }
+  // Get all inventory items
+  const allInventory = await db.select().from(inventoryTable)
 
-  // Fetch all inventory items
-  const allInventory = await payload.find({
-    collection: 'inventory',
-    limit: 1000, // Adjust based on your expected inventory count
-    user,
-  })
-
-  const total = allInventory.docs.length
+  const total = allInventory.length
 
   // Count by type
   const byType = {
@@ -93,7 +78,7 @@ export async function getInventoryStats(): Promise<InventoryStats> {
     underRepair: 0,
   }
 
-  allInventory.docs.forEach((item: Inventory) => {
+  allInventory.forEach((item) => {
     // Count by type
     switch (item.itemType) {
       case 'laptop':

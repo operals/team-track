@@ -13,7 +13,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Plus } from 'lucide-react'
-import type { PayrollSetting, User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { payrollSettingsTable, usersTable } from '@/db/schema'
+
+type PayrollSetting = InferSelectModel<typeof payrollSettingsTable> & {
+  employee?: User | null
+}
+type User = InferSelectModel<typeof usersTable>
 import { PayrollSettingsTable } from '@/components/payroll/settings/table'
 
 interface PayrollSettingsListProps {
@@ -44,7 +50,7 @@ export function PayrollSettingsList({ data }: PayrollSettingsListProps) {
 
       const description = (item.description || '').toLowerCase()
       const payrollType = String(item.payrollType || '').toLowerCase()
-      const paymentType = String(item.paymentDetails?.paymentType || '').toLowerCase()
+      const paymentType = String(item.paymentType || '').toLowerCase()
 
       // Apply type filter
       if (typeFilter !== 'all' && payrollType !== typeFilter) return false

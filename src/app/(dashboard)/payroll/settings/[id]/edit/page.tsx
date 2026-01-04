@@ -1,7 +1,8 @@
-import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
+import { db } from '@/db'
+import { requireAuth } from '@/lib/auth-guards'
+import { usersTable, payrollSettingsTable } from '@/db/schema'
+import { eq } from 'drizzle-orm'
 import { SettingsForm } from '@/components/payroll/forms/settings-form'
 import { SetBreadcrumbLabel } from '@/components/set-breadcrumb-label'
 
@@ -11,30 +12,29 @@ interface EditPayrollSettingPageProps {
 
 export default async function EditPayrollSettingPage({ params }: EditPayrollSettingPageProps) {
   const { id } = await params
-  const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
-  if (!user) redirect('/login')
+  await requireAuth()
 
   try {
-    const settingItem = await payload.findByID({
-      collection: 'payroll-settings',
-      id,
-      depth: 2,
-      user,
+    const settingItem = await db.query.payrollSettingsTable.findFirst({
+      where: eq(payrollSettingsTable.id, id),
+      with: {
+        employee: true,
+      },
     })
-    const userResult = await payload.find({
-      collection: 'users',
+
+    if (!settingItem) {
+      notFound()
+    }
+
+    const users = await db.query.usersTable.findMany({
+      orderBy: (users, { asc }) => [asc(users.fullName)],
       limit: 100,
-      sort: 'fullName',
-      user,
     })
 
     const handleUpdate = async (formData: FormData) => {
       'use server'
 
-      const payload = await getPayload({ config: configPromise })
-      const { user } = await payload.auth({ headers: await headers() })
-      if (!user) throw new Error('Unauthorized')
+      await requireAuth()
 
       const employeeId = String(formData.get('employee') || '')
       const payrollType = String(formData.get('payrollType') || 'primary')
@@ -51,43 +51,39 @@ export default async function EditPayrollSettingPage({ params }: EditPayrollSett
       const endDate = String(formData.get('endDate') || '')
       const notes = String(formData.get('notes') || '')
 
-      const data: any = {
-        employee: parseInt(employeeId),
-        payrollType: payrollType as
-          | 'primary'
-          | 'bonus'
-          | 'overtime'
-          | 'commission'
-          | 'allowance'
-          | 'other',
-        description: description || null,
-        paymentDetails: {
-          amount,
+      await db
+        .update(payrollSettingsTable)
+        .set({
+          employeeId,
+          payrollType: payrollType as
+            | 'primary'
+            | 'bonus'
+            | 'overtime'
+            | 'commission'
+            | 'allowance'
+            | 'other',
+          description: description || null,
+          amount: String(amount),
           paymentType: paymentType as 'bankTransfer' | 'cash' | 'cheque',
           paymentFrequency: paymentFrequency as 'monthly' | 'quarterly' | 'annual' | 'oneTime',
-        },
-        bankAccount: {
-          accountNumber: accountNumber || null,
-          bankName: bankName || null,
-          accountHolderName: accountHolderName || null,
-          swiftCode: swiftCode || null,
-        },
-        isActive,
-        effectiveDate: {
-          startDate,
-          endDate: endDate || null,
-        },
-        notes: notes || null,
-      }
+          bankAccount: {
+            accountNumber: accountNumber || undefined,
+            bankName: bankName || undefined,
+            accountHolderName: accountHolderName || undefined,
+            swiftCode: swiftCode || undefined,
+          },
+          isActive,
+          startDate: new Date(startDate),
+          endDate: endDate ? new Date(endDate) : null,
+          notes: notes || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(payrollSettingsTable.id, id))
 
-      await payload.update({ collection: 'payroll-settings', id, data, user })
       redirect('/payroll/settings')
     }
 
-    const employeeName =
-      typeof settingItem.employee === 'object' && settingItem.employee
-        ? (settingItem.employee as any).fullName
-        : 'Setting'
+    const employeeName = settingItem.employee?.fullName || 'Setting'
 
     const label = settingItem.description || `${employeeName} - ${settingItem.payrollType}`
 
@@ -98,7 +94,7 @@ export default async function EditPayrollSettingPage({ params }: EditPayrollSett
           mode="edit"
           initialData={settingItem}
           formAction={handleUpdate}
-          employees={userResult.docs.map((u) => ({ value: String(u.id), label: u.fullName }))}
+          employees={users.map((u) => ({ value: String(u.id), label: u.fullName }))}
         />
       </>
     )

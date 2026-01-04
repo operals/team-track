@@ -1,8 +1,9 @@
-import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
+import { db } from '@/db'
+import { requireAuth } from '@/lib/auth-guards'
 import { ApplicantDetail } from '@/components/applicants/applicant-detail'
+import { eq } from 'drizzle-orm'
+import { applicantsTable } from '@/db/schema'
 
 interface ApplicantPageProps {
   params: Promise<{
@@ -12,18 +13,19 @@ interface ApplicantPageProps {
 
 export default async function ApplicantPage({ params }: ApplicantPageProps) {
   const { id } = await params
-  const payload = await getPayload({ config: configPromise })
-  const { user: currentUser } = await payload.auth({ headers: await headers() })
-
-  if (!currentUser) redirect('/login')
+  const currentUser = await requireAuth()
 
   try {
-    const applicant = await payload.findByID({
-      collection: 'applicants',
-      id: id,
-      depth: 2, // to resolve department, reviewedBy, and convertedToUser relationships
-      user: currentUser,
+    const applicant = await db.query.applicantsTable.findFirst({
+      where: eq(applicantsTable.id, id),
+      with: {
+        cv: true,
+      },
     })
+
+    if (!applicant) {
+      notFound()
+    }
 
     return <ApplicantDetail applicant={applicant} currentUser={currentUser} />
   } catch (error) {

@@ -1,6 +1,25 @@
 'use client'
 
-import { User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { usersTable } from '@/db/schema'
+
+type User = InferSelectModel<typeof usersTable> & {
+  role?: { id: string; name: string } | null
+  departments?: Array<{
+    id: string
+    userId: string
+    departmentId: string
+    createdAt: Date
+    department: {
+      id: string
+      name: string
+      isActive: boolean
+      createdAt: Date
+      updatedAt: Date
+      description: string | null
+    }
+  }>
+}
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'

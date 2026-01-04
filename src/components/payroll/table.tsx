@@ -1,7 +1,17 @@
 'use client'
 
 import * as React from 'react'
-import { Payroll, User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { payrollTable, usersTable } from '@/db/schema'
+
+type Payroll = InferSelectModel<typeof payrollTable>
+type User = InferSelectModel<typeof usersTable>
+
+type PayrollWithEmployee = Payroll & {
+  employee?: User | null
+  processedBy?: User | null
+}
+
 import { Badge } from '../ui/badge'
 import { DataTable } from '../data-table'
 import { Button } from '../ui/button'
@@ -25,11 +35,14 @@ import {
 } from '@/components/ui/alert-dialog'
 
 interface PayrollTableProps {
-  data: Payroll[]
+  data: PayrollWithEmployee[]
   enablePagination?: boolean
 }
 
-type ExpandedPayroll = Payroll & { currentItemIndex?: number; originalId?: string | number }
+type ExpandedPayroll = PayrollWithEmployee & {
+  currentItemIndex?: number
+  originalId?: string | number
+}
 
 type PayrollStatus = 'generated' | 'approved' | 'paid' | 'cancelled'
 
@@ -181,9 +194,9 @@ export function PayrollTable({ data, enablePagination = true }: PayrollTableProp
 
   const columns = [
     {
-      key: 'employee' as keyof Payroll,
+      key: 'employee' as keyof ExpandedPayroll,
       header: 'Employee',
-      render: (value: unknown, item: Payroll) => {
+      render: (value: unknown, item: ExpandedPayroll) => {
         const employee = item.employee
         return typeof employee === 'object' && employee !== null && 'fullName' in employee
           ? (employee as User).fullName
@@ -191,14 +204,15 @@ export function PayrollTable({ data, enablePagination = true }: PayrollTableProp
       },
     },
     {
-      key: 'period' as keyof Payroll,
+      key: 'month' as keyof ExpandedPayroll,
       header: 'Period',
-      render: (value: unknown, item: Payroll) => formatPeriod(item.period || {}),
+      render: (value: unknown, item: ExpandedPayroll) =>
+        formatPeriod({ month: item.month, year: item.year }),
     },
     {
-      key: 'payrollItems' as keyof Payroll,
+      key: 'payrollItems' as keyof ExpandedPayroll,
       header: 'Payment Method',
-      render: (value: unknown, item: Payroll) => {
+      render: (value: unknown, item: ExpandedPayroll) => {
         const items = item.payrollItems
         if (!items || !Array.isArray(items) || items.length === 0) return '-'
 
@@ -225,9 +239,9 @@ export function PayrollTable({ data, enablePagination = true }: PayrollTableProp
       },
     },
     {
-      key: 'totalAmount' as keyof Payroll,
+      key: 'totalAmount' as keyof ExpandedPayroll,
       header: 'Amount',
-      render: (value: unknown, item: Payroll) => {
+      render: (value: unknown, item: ExpandedPayroll) => {
         const items = item.payrollItems
         if (!items || !Array.isArray(items) || items.length === 0) return formatCurrency(0)
 
@@ -235,9 +249,8 @@ export function PayrollTable({ data, enablePagination = true }: PayrollTableProp
         if (!payrollItem) return formatCurrency(0)
 
         const baseAmount = (payrollItem as any).amount || 0
-        const adjustments = item.adjustments
-        const bonus = adjustments?.bonusAmount || 0
-        const deduction = adjustments?.deductionAmount || 0
+        const bonus = parseFloat(item.bonusAmount || '0')
+        const deduction = parseFloat(item.deductionAmount || '0')
 
         // If no adjustments, just show the amount
         if (bonus === 0 && deduction === 0) {
@@ -257,9 +270,9 @@ export function PayrollTable({ data, enablePagination = true }: PayrollTableProp
       },
     },
     {
-      key: 'adjustments' as keyof Payroll,
+      key: 'bonusAmount' as keyof ExpandedPayroll,
       header: 'Net Total',
-      render: (value: unknown, item: Payroll) => {
+      render: (value: unknown, item: ExpandedPayroll) => {
         const items = item.payrollItems
         if (!items || !Array.isArray(items) || items.length === 0) return formatCurrency(0)
 
@@ -267,9 +280,8 @@ export function PayrollTable({ data, enablePagination = true }: PayrollTableProp
         if (!payrollItem) return formatCurrency(0)
 
         const baseAmount = (payrollItem as any).amount || 0
-        const adjustments = item.adjustments
-        const bonus = adjustments?.bonusAmount || 0
-        const deduction = adjustments?.deductionAmount || 0
+        const bonus = parseFloat(item.bonusAmount || '0')
+        const deduction = parseFloat(item.deductionAmount || '0')
 
         const netTotal = baseAmount + bonus - deduction
 
@@ -277,9 +289,9 @@ export function PayrollTable({ data, enablePagination = true }: PayrollTableProp
       },
     },
     {
-      key: 'status' as keyof Payroll,
+      key: 'status' as keyof ExpandedPayroll,
       header: 'Status',
-      render: (value: unknown, item: Payroll) => {
+      render: (value: unknown, item: ExpandedPayroll) => {
         const currentStatus = String(value) as PayrollStatus
 
         // Extract the actual numeric ID for comparison
@@ -421,7 +433,7 @@ export function PayrollTable({ data, enablePagination = true }: PayrollTableProp
 
   return (
     <div className="space-y-4">
-      <DataTable<Payroll>
+      <DataTable<ExpandedPayroll>
         data={data}
         columns={columns}
         actionColumn={actionColumn}

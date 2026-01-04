@@ -13,7 +13,20 @@ import { LeavesCard } from '@/components/user/leaves-card'
 import { InventoryCard } from '@/components/user/inventory-card'
 import { DocumentsCard } from '@/components/user/documents-card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import type { User, Inventory, LeaveDay, Payroll, PayrollSetting } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import {
+  usersTable,
+  inventoryTable,
+  leavesTable,
+  payrollTable,
+  payrollSettingsTable,
+} from '@/db/schema'
+
+type User = InferSelectModel<typeof usersTable>
+type Inventory = InferSelectModel<typeof inventoryTable>
+type LeaveDay = InferSelectModel<typeof leavesTable>
+type Payroll = InferSelectModel<typeof payrollTable>
+type PayrollSetting = InferSelectModel<typeof payrollSettingsTable>
 
 interface EmployeeProfileViewProps {
   user: User

@@ -1,9 +1,10 @@
-import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
+import { db } from '@/db'
+import { requireAuth } from '@/lib/auth-guards'
 import { UserForm } from '@/components/user/forms/user-form'
 import { SetBreadcrumbLabel } from '@/components/set-breadcrumb-label'
+import { eq, asc } from 'drizzle-orm'
+import { usersTable, departmentsTable, rolesTable, userDepartmentsTable } from '@/db/schema'
 
 interface EditUserPageProps {
   params: Promise<{
@@ -13,71 +14,61 @@ interface EditUserPageProps {
 
 export default async function EditUserPage({ params }: EditUserPageProps) {
   const { id } = await params
-  const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
-  if (!user) redirect('/login')
+  await requireAuth()
 
   try {
     // Fetch the user to edit
-    const userToEdit = await payload.findByID({
-      collection: 'users',
-      id: id,
-      depth: 2, // to resolve relationships
-      user,
+    const userToEdit = await db.query.usersTable.findFirst({
+      where: eq(usersTable.id, id),
+      with: {
+        role: true,
+        departments: {
+          with: {
+            department: true,
+          },
+        },
+      },
     })
 
+    if (!userToEdit) {
+      notFound()
+    }
+
     // Fetch departments and roles for dropdowns
-    const [departmentsResult, rolesResult] = await Promise.all([
-      payload.find({
-        collection: 'departments',
-        limit: 100,
-        sort: 'name',
-        user,
-      }),
-      payload.find({
-        collection: 'roles',
-        limit: 100,
-        sort: 'name',
-        user,
-      }),
+    const [departments, roles] = await Promise.all([
+      db.select().from(departmentsTable).orderBy(asc(departmentsTable.name)),
+      db.select().from(rolesTable).orderBy(asc(rolesTable.name)),
     ])
 
     const handleUpdateUser = async (formData: FormData) => {
       'use server'
 
-      const payload = await getPayload({ config: configPromise })
-      const { user } = await payload.auth({ headers: await headers() })
+      await requireAuth()
 
-      if (!user) {
-        throw new Error('Unauthorized')
-      }
-
-      // Handle photo upload if file is provided
-      let photoId: number | string | null = null
+      // Handle photo upload via API if file is provided
+      let photoPath: string | null = null
       const photo = formData.get('photo') as File | null
       const fullName = String(formData.get('fullName') || '')
 
       if (photo && typeof photo === 'object' && 'arrayBuffer' in photo && photo.size > 0) {
-        const arrayBuffer = await photo.arrayBuffer()
-        const buffer = Buffer.from(arrayBuffer)
+        const uploadFormData = new FormData()
+        uploadFormData.append('file', photo)
 
-        const uploadResult = await payload.create({
-          collection: 'media',
-          data: {
-            alt: `${fullName} profile photo`,
+        const uploadRes = await fetch(
+          `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/api/upload`,
+          {
+            method: 'POST',
+            body: uploadFormData,
           },
-          file: {
-            data: buffer,
-            mimetype: photo.type,
-            name: photo.name,
-            size: photo.size,
-          },
-          user,
-        })
-        photoId = uploadResult.id
+        )
+
+        if (uploadRes.ok) {
+          const { url } = await uploadRes.json()
+          photoPath = url
+        }
       } else {
-        // Keep existing if present via initial data (not sent by form)
-        photoId = null
+        // Keep existing photo if present
+        photoPath = null
       }
 
       // Normalize optionals; email field must not receive empty string
@@ -90,7 +81,7 @@ export default async function EditUserPage({ params }: EditUserPageProps) {
       // Update the user
       const userData: any = {
         fullName,
-        ...(photoId && { photo: photoId }),
+        ...(photoPath && { photo: photoPath }),
         birthDate: String(formData.get('birthDate') || ''),
         primaryPhone: String(formData.get('primaryPhone') || ''),
         ...(email ? { email } : {}),
@@ -112,61 +103,57 @@ export default async function EditUserPage({ params }: EditUserPageProps) {
       userData.secondaryPhone = secondaryPhone || null
       userData.secondaryEmail = secondaryEmail || null
 
-      // Handle departments array (multi-select)
-      const departmentIds: number[] = []
+      // Handle departments array (multi-select) - will update junction table
+      const departmentIds: string[] = []
       let index = 0
       while (formData.has(`departments[${index}]`)) {
         const deptId = String(formData.get(`departments[${index}]`))
-        if (deptId) departmentIds.push(parseInt(deptId))
+        if (deptId) departmentIds.push(deptId)
         index++
       }
-      if (departmentIds.length > 0) userData.departments = departmentIds
 
-      // Convert role string ID to number if value provided
-      const role = String(formData.get('role') || '')
-      if (role) userData.role = parseInt(role)
+      // Convert role string ID if value provided
+      const roleId = String(formData.get('role') || '')
+      if (roleId) userData.roleId = roleId
 
-      // Handle documents upload (multi-file)
-      // Get existing document IDs from the current user
-      const existingDocIds = Array.isArray(userToEdit.documents)
-        ? userToEdit.documents.map((doc) =>
-            typeof doc === 'object' && doc && 'id' in doc ? Number(doc.id) : Number(doc),
-          )
+      // Handle documents upload (multi-file) via API
+      // Get existing document paths from the current user
+      const existingDocPaths = userToEdit.documents
+        ? typeof userToEdit.documents === 'string'
+          ? JSON.parse(userToEdit.documents)
+          : userToEdit.documents
         : []
 
-      const documentIds: number[] = [...existingDocIds]
+      const documentPaths: string[] = Array.isArray(existingDocPaths) ? [...existingDocPaths] : []
       let docIndex = 0
       while (formData.has(`documents[${docIndex}]`)) {
         const doc = formData.get(`documents[${docIndex}]`) as File | string
         if (doc && typeof doc === 'object' && 'arrayBuffer' in doc && doc.size > 0) {
           // New file upload
-          const arrayBuffer = await doc.arrayBuffer()
-          const buffer = Buffer.from(arrayBuffer)
+          const uploadFormData = new FormData()
+          uploadFormData.append('file', doc)
 
-          const uploadResult = await payload.create({
-            collection: 'media',
-            data: {
-              alt: `${fullName} - ${doc.name}`,
+          const uploadRes = await fetch(
+            `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/api/upload`,
+            {
+              method: 'POST',
+              body: uploadFormData,
             },
-            file: {
-              data: buffer,
-              mimetype: doc.type,
-              name: doc.name,
-              size: doc.size,
-            },
-            user,
-          })
-          documentIds.push(uploadResult.id as number)
+          )
+
+          if (uploadRes.ok) {
+            const { url } = await uploadRes.json()
+            documentPaths.push(url)
+          }
         } else if (typeof doc === 'string' && doc) {
-          // Existing document ID - keep it if not already in array
-          const docId = parseInt(doc)
-          if (!documentIds.includes(docId)) {
-            documentIds.push(docId)
+          // Existing document path - keep it if not already in array
+          if (!documentPaths.includes(doc)) {
+            documentPaths.push(doc)
           }
         }
         docIndex++
       }
-      userData.documents = documentIds
+      userData.documents = JSON.stringify(documentPaths)
 
       // Employment fields
       const baseSalary = formData.get('baseSalary')
@@ -178,12 +165,28 @@ export default async function EditUserPage({ params }: EditUserPageProps) {
         paymentType,
       }
 
-      await payload.update({
-        collection: 'users',
-        id: id,
-        data: userData as any,
-        user,
-      })
+      // Update user in database
+      await db
+        .update(usersTable)
+        .set({
+          ...userData,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(usersTable.id, id))
+
+      // Update department assignments in junction table
+      // Delete existing assignments
+      await db.delete(userDepartmentsTable).where(eq(userDepartmentsTable.userId, id))
+
+      // Insert new assignments
+      if (departmentIds.length > 0) {
+        await db.insert(userDepartmentsTable).values(
+          departmentIds.map((deptId) => ({
+            userId: id,
+            departmentId: deptId,
+          })),
+        )
+      }
 
       // Redirect back to the user profile
       redirect(`/users/${id}`)
@@ -196,11 +199,11 @@ export default async function EditUserPage({ params }: EditUserPageProps) {
           mode="edit"
           initialData={userToEdit}
           formAction={handleUpdateUser}
-          departments={departmentsResult.docs.map((dept) => ({
+          departments={departments.map((dept) => ({
             value: String(dept.id),
             label: dept.name,
           }))}
-          roles={rolesResult.docs.map((role) => ({ value: String(role.id), label: role.name }))}
+          roles={roles.map((role) => ({ value: String(role.id), label: role.displayName }))}
         />
       </>
     )

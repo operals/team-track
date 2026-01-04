@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
+import { db } from '@/db'
+import { requireAuth } from '@/lib/auth-guards'
+import { desc } from 'drizzle-orm'
 
 import { Tabs, TabsContent } from '@radix-ui/react-tabs'
 import { UserList } from '@/components/user/user-list'
@@ -13,24 +13,20 @@ export const metadata: Metadata = {
 }
 
 export default async function Page() {
-  const payload = await getPayload({ config: configPromise })
+  await requireAuth()
 
-  // Authenticate using the request cookies (same login as /admin)
-  const { user } = await payload.auth({ headers: await headers() })
-  if (!user) redirect('/login')
-
-  // Fetch Users (team) docs - Exclude super admins
-  const { docs } = await payload.find({
-    collection: 'users',
-    depth: 2,
+  // Fetch Users with role and departments
+  const users = await db.query.usersTable.findMany({
+    orderBy: (users, { desc }) => [desc(users.joinedAt)],
     limit: 50,
-    sort: '-joinedAt',
-    where: {
-      isSuperAdmin: {
-        not_equals: true,
+    with: {
+      role: true,
+      departments: {
+        with: {
+          department: true,
+        },
       },
     },
-    user,
   })
 
   return (
@@ -40,7 +36,7 @@ export default async function Page() {
         className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
       >
         <div className="space-y-4 p-4 lg:p-6">
-          <UserList data={docs} />
+          <UserList data={users} />
         </div>
       </TabsContent>
     </Tabs>

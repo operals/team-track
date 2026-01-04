@@ -2,7 +2,10 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import type { LeaveDay } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { leavesTable } from '@/db/schema'
+
+type LeaveDay = InferSelectModel<typeof leavesTable>
 import { Card, CardContent, CardHeader } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
@@ -69,10 +72,7 @@ export function LeavesCard({ leaves = [], createHref = '/leaves/new' }: LeavesCa
         const isFinalStatus = ['approved', 'rejected', 'cancelled'].includes(status)
 
         return (
-          <Badge
-            variant={getStatusVariant(status)}
-            className={`capitalize ${isFinalStatus}`}
-          >
+          <Badge variant={getStatusVariant(status)} className={`capitalize ${isFinalStatus}`}>
             {status}
             {isFinalStatus && ' ✓'}
           </Badge>
@@ -107,14 +107,7 @@ export function LeavesCard({ leaves = [], createHref = '/leaves/new' }: LeavesCa
           <div className="w-full space-y-4">
             {leaves.length > 0 ? (
               <div className="w-full overflow-auto">
-                <DataTable<LeaveDay>
-                  data={leaves.map((item) => ({
-                    ...item,
-                    id: Number(item.id),
-                  }))}
-                  columns={columns}
-                  enablePagination={false}
-                />
+                <DataTable<LeaveDay> data={leaves} columns={columns} enablePagination={false} />
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No leave records found.</p>

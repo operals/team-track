@@ -4,7 +4,11 @@ import * as React from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/data-table'
-import type { Payroll, PayrollSetting } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { payrollTable, payrollSettingsTable } from '@/db/schema'
+
+type Payroll = InferSelectModel<typeof payrollTable>
+type PayrollSetting = InferSelectModel<typeof payrollSettingsTable>
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 interface PayrollCardProps {
@@ -43,11 +47,12 @@ export function PayrollCard({ payrollHistory = [], payrollSettings = [] }: Payro
   // Payment history table columns
   const historyColumns = [
     {
-      key: 'period' as keyof Payroll,
+      key: 'month' as keyof Payroll,
       header: 'Period',
-      render: (value: unknown) => {
-        const period = value as { month: string; year: number }
-        if (!period) return '-'
+      render: (value: unknown, item: Payroll) => {
+        const month = item.month
+        const year = item.year
+        if (!month || !year) return '-'
         const monthNames = {
           '01': 'Jan',
           '02': 'Feb',
@@ -62,7 +67,7 @@ export function PayrollCard({ payrollHistory = [], payrollSettings = [] }: Payro
           '11': 'Nov',
           '12': 'Dec',
         }
-        return `${monthNames[period.month as keyof typeof monthNames]} ${period.year}`
+        return `${monthNames[month as keyof typeof monthNames]} ${year}`
       },
     },
     {
@@ -123,9 +128,8 @@ export function PayrollCard({ payrollHistory = [], payrollSettings = [] }: Payro
           return sum + ((payrollItem as any).amount || 0)
         }, 0)
 
-        const adjustments = item.adjustments
-        const bonus = adjustments?.bonusAmount || 0
-        const deduction = adjustments?.deductionAmount || 0
+        const bonus = Number(item.bonusAmount || 0)
+        const deduction = Number(item.deductionAmount || 0)
 
         // If no adjustments, just show the amount
         if (bonus === 0 && deduction === 0) {
@@ -145,12 +149,10 @@ export function PayrollCard({ payrollHistory = [], payrollSettings = [] }: Payro
       },
     },
     {
-      key: 'adjustments' as keyof Payroll,
+      key: 'status' as keyof Payroll,
       header: 'Net Total',
       render: (value: unknown, item: Payroll) => {
-        return (
-          <span className="font-medium">{formatCurrency((item.totalAmount as number) || 0)}</span>
-        )
+        return <span className="font-medium">{formatCurrency(Number(item.totalAmount) || 0)}</span>
       },
     },
     {
@@ -190,14 +192,14 @@ export function PayrollCard({ payrollHistory = [], payrollSettings = [] }: Payro
       key: 'amount' as keyof PayrollSetting,
       header: 'Amount',
       render: (value: unknown, item: PayrollSetting) => {
-        return formatCurrency((item.paymentDetails as any)?.amount)
+        return formatCurrency(Number(item.amount))
       },
     },
     {
       key: 'paymentType' as keyof PayrollSetting,
       header: 'Payment Method',
       render: (value: unknown, item: PayrollSetting) => {
-        const paymentType = (item.paymentDetails as any)?.paymentType
+        const paymentType = item.paymentType
         const paymentLabels = {
           bankTransfer: 'Bank Transfer',
           cash: 'Cash',
@@ -210,7 +212,7 @@ export function PayrollCard({ payrollHistory = [], payrollSettings = [] }: Payro
       key: 'paymentFrequency' as keyof PayrollSetting,
       header: 'Frequency',
       render: (value: unknown, item: PayrollSetting) => {
-        const freq = (item.paymentDetails as any)?.paymentFrequency
+        const freq = item.paymentFrequency
         const freqLabels = {
           monthly: 'Monthly',
           quarterly: 'Quarterly',
@@ -255,10 +257,7 @@ export function PayrollCard({ payrollHistory = [], payrollSettings = [] }: Payro
             {payrollSettings.length > 0 ? (
               <div className="w-full overflow-auto">
                 <DataTable<PayrollSetting>
-                  data={payrollSettings.map((item) => ({
-                    ...item,
-                    id: Number(item.id),
-                  }))}
+                  data={payrollSettings}
                   columns={settingsColumns}
                   enablePagination={false}
                 />
@@ -275,10 +274,7 @@ export function PayrollCard({ payrollHistory = [], payrollSettings = [] }: Payro
             {payrollHistory.length > 0 ? (
               <div className="w-full overflow-auto">
                 <DataTable<Payroll>
-                  data={payrollHistory.map((item) => ({
-                    ...item,
-                    id: Number(item.id),
-                  }))}
+                  data={payrollHistory}
                   columns={historyColumns}
                   enablePagination={false}
                 />

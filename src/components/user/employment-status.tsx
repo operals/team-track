@@ -1,7 +1,10 @@
 'use client'
 import * as React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { User } from '@/payload-types'
+import type { InferSelectModel } from 'drizzle-orm'
+import { usersTable } from '@/db/schema'
+
+type User = InferSelectModel<typeof usersTable>
 import { formatDate } from '@/lib/date-utils'
 
 interface EmploymentStatusCardProps {
@@ -28,9 +31,7 @@ export function EmploymentStatusCard({ user }: EmploymentStatusCardProps) {
         </div>
         <div>
           <div className="font-medium">Identification No.</div>
-          <div className="text-muted-foreground">
-            {user.identityNumber || 'Not specified'}
-          </div>
+          <div className="text-muted-foreground">{user.identityNumber || 'Not specified'}</div>
         </div>
         <div>
           <div className="font-medium">Employment Type</div>
