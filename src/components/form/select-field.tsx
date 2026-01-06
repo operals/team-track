@@ -56,56 +56,61 @@ export function SelectField<TFieldValues extends FieldValues>({
       <Controller
         control={control}
         name={name}
-        render={({ field }) => (
-          <>
-            {/* Hidden input to include value in native form submission */}
-            <input type="hidden" name={String(name)} value={field.value ?? ''} />
-            <Select
-              value={field.value ?? ''}
-              onValueChange={(value) => {
-                if (!disabled) {
-                  field.onChange(value)
-                }
-              }}
-            >
-              <SelectTrigger id={String(name)} disabled={disabled}>
-                <SelectValue placeholder={placeholder} />
-              </SelectTrigger>
-              {!disabled && (
-                <SelectContent>
-                  {searchable && (
-                    <div className="flex items-center border-b px-3 pb-2">
-                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                      <Input
-                        placeholder="Search..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="h-8 w-full border-0 bg-transparent p-2 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0"
-                        onKeyDown={(e) => {
-                          // Prevent select from closing when typing
-                          e.stopPropagation()
-                        }}
-                      />
-                    </div>
-                  )}
-                  <div className={searchable ? 'max-h-[200px] overflow-auto' : ''}>
-                    {filteredOptions.length === 0 ? (
-                      <div className="py-6 text-center text-sm text-muted-foreground">
-                        No results found.
+        render={({ field }) => {
+          // Safely convert field value to string
+          const stringValue = field.value != null ? String(field.value) : ''
+
+          return (
+            <>
+              {/* Hidden input to include value in native form submission */}
+              <input type="hidden" name={String(name)} value={stringValue} />
+              <Select
+                value={stringValue}
+                onValueChange={(value) => {
+                  if (!disabled) {
+                    field.onChange(value)
+                  }
+                }}
+              >
+                <SelectTrigger id={String(name)} disabled={disabled}>
+                  <SelectValue placeholder={placeholder} />
+                </SelectTrigger>
+                {!disabled && (
+                  <SelectContent>
+                    {searchable && (
+                      <div className="flex items-center border-b px-3 pb-2">
+                        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                        <Input
+                          placeholder="Search..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="h-8 w-full border-0 bg-transparent p-2 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0"
+                          onKeyDown={(e) => {
+                            // Prevent select from closing when typing
+                            e.stopPropagation()
+                          }}
+                        />
                       </div>
-                    ) : (
-                      filteredOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))
                     )}
-                  </div>
-                </SelectContent>
-              )}
-            </Select>
-          </>
-        )}
+                    <div className={searchable ? 'max-h-[200px] overflow-auto' : ''}>
+                      {filteredOptions.length === 0 ? (
+                        <div className="py-6 text-center text-sm text-muted-foreground">
+                          No results found.
+                        </div>
+                      ) : (
+                        filteredOptions.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </SelectContent>
+                )}
+              </Select>
+            </>
+          )
+        }}
       />
       {error && <p className="text-sm text-red-500 mt-1">{error}</p>}
     </div>

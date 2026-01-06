@@ -17,22 +17,36 @@ type User = InferSelectModel<typeof usersTable> & {
     id: string
     userId: string
     departmentId: string
-    createdAt: Date
+    createdAt: Date | string
     department: {
       id: string
       name: string
       isActive: boolean
-      createdAt: Date
-      updatedAt: Date
+      createdAt: Date | string
+      updatedAt: Date | string
       description: string | null
     }
   }>
 }
+
+// Serializable version of User type for RSC boundaries
+type SerializableUser = Omit<
+  User,
+  'birthDate' | 'joinedAt' | 'workPermitExpiry' | 'createdAt' | 'updatedAt' | 'emailVerified'
+> & {
+  birthDate?: string | Date | null
+  joinedAt?: string | Date | null
+  workPermitExpiry?: string | Date | null
+  createdAt?: string | Date | null
+  updatedAt?: string | Date | null
+  emailVerified?: string | Date | null
+}
+
 import { useForm, Controller, SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { UserFormSchema, type UserFormValues } from './user-form.schema'
 import { SelectField } from '@/components/form/select-field'
-import { MultiSelectField } from '@/components/form/multi-select-field'
+import { ComboboxMultiSelect } from '@/components/form/combobox-multi-select'
 import { InputField } from '@/components/form/input-field'
 import { Spinner } from '@/components/ui/spinner'
 import { Separator } from '@/components/ui/separator'
@@ -44,7 +58,7 @@ import { formatDateForInput } from '@/lib/date-utils'
 import { COUNTRIES } from '@/lib/countries'
 
 interface UserFormProps {
-  initialData?: Partial<User>
+  initialData?: Partial<SerializableUser>
   onSubmit?: (data: UserFormValues) => Promise<any>
   formAction?: (formData: FormData) => Promise<void>
   mode: 'create' | 'edit'
@@ -271,11 +285,13 @@ export function UserForm({
 
                 <InputField label="Job Title" name={'jobTitle'} register={register} />
 
-                <MultiSelectField
+                <ComboboxMultiSelect
                   control={control}
                   name={'departments'}
                   label="Departments"
-                  placeholder="Select departments"
+                  placeholder="Select departments..."
+                  searchPlaceholder="Search departments..."
+                  emptyMessage="No departments found."
                   options={departments}
                   error={errors.departments?.message as string | undefined}
                 />

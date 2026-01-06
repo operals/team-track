@@ -8,6 +8,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 
 export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) {
   const [emailOrUsername, setEmailOrUsername] = useState('')
@@ -22,29 +23,18 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
     setError('')
 
     try {
-      // Determine if the input is an email or username
-      const isEmail = emailOrUsername.includes('@')
-      const loginData = isEmail
-        ? { email: emailOrUsername, password }
-        : { username: emailOrUsername, password }
-
-      const response = await fetch('/api/users/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(loginData),
-        credentials: 'include', // Important for cookies
+      const result = await signIn('credentials', {
+        email: emailOrUsername, // NextAuth will handle both email and username
+        password,
+        redirect: false,
       })
 
-      if (response.ok) {
-        // Successful login - session will be updated
-        // Use window.location for full page reload to ensure session is fresh
-        window.location.href = '/'
-        return
-      } else {
-        const data = await response.json()
-        setError(data.message || 'Login failed')
+      if (result?.error) {
+        setError('Invalid email/username or password')
+      } else if (result?.ok) {
+        // Successful login
+        router.push('/')
+        router.refresh()
       }
     } catch (err) {
       setError('An error occurred during login')

@@ -2,7 +2,7 @@ import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { db } from '@/db'
 import { usersTable } from '@/db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, or } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -24,8 +24,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null
         }
 
+        // Support both email and username login
         const user = await db.query.usersTable.findFirst({
-          where: eq(usersTable.email, credentials.email as string),
+          where: or(
+            eq(usersTable.email, credentials.email as string),
+            eq(usersTable.username, credentials.email as string),
+          ),
           with: {
             role: true,
             departments: {

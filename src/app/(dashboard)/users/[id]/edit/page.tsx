@@ -192,12 +192,38 @@ export default async function EditUserPage({ params }: EditUserPageProps) {
       redirect(`/users/${id}`)
     }
 
+    // Serialize Date objects to ISO strings before crossing the RSC boundary
+    // This prevents "toISOString is not a function" errors in client components
+    const serializableUser = {
+      ...userToEdit,
+      // Convert all Date fields to ISO strings
+      birthDate: userToEdit.birthDate ? userToEdit.birthDate.toISOString() : null,
+      joinedAt: userToEdit.joinedAt ? userToEdit.joinedAt.toISOString() : null,
+      workPermitExpiry: userToEdit.workPermitExpiry
+        ? userToEdit.workPermitExpiry.toISOString()
+        : null,
+      createdAt: userToEdit.createdAt ? userToEdit.createdAt.toISOString() : null,
+      updatedAt: userToEdit.updatedAt ? userToEdit.updatedAt.toISOString() : null,
+      emailVerified: userToEdit.emailVerified ? userToEdit.emailVerified : null,
+      // Serialize dates in nested department relations
+      departments:
+        userToEdit.departments?.map((dept) => ({
+          ...dept,
+          createdAt: dept.createdAt ? dept.createdAt.toISOString() : '',
+          department: {
+            ...dept.department,
+            createdAt: dept.department.createdAt ? dept.department.createdAt.toISOString() : '',
+            updatedAt: dept.department.updatedAt ? dept.department.updatedAt.toISOString() : '',
+          },
+        })) ?? [],
+    }
+
     return (
       <>
         <SetBreadcrumbLabel label={userToEdit.fullName} />
         <UserForm
           mode="edit"
-          initialData={userToEdit}
+          initialData={serializableUser}
           formAction={handleUpdateUser}
           departments={departments.map((dept) => ({
             value: String(dept.id),

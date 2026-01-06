@@ -20,41 +20,15 @@ import {
 } from '@/components/ui/sidebar'
 
 import { logoutAction } from '@/lib/actions/auth'
-import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import { LogOut, User } from 'lucide-react'
 
-interface NavUserProps {
-  id: string
-  email: string
-  username?: string
-  fullName?: string
-  photo?: string | null
-}
-
 export function NavUser() {
-  const [user, setUser] = useState<NavUserProps | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { data: session, status } = useSession()
   const { isMobile } = useSidebar()
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const response = await fetch('/api/users/me', {
-          credentials: 'include',
-        })
-        if (response.ok) {
-          const data = await response.json()
-          setUser(data.user)
-        }
-      } catch (error) {
-        console.error('Failed to fetch user:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchUser()
-  }, [])
+  const loading = status === 'loading'
+  const user = session?.user
 
   const handleLogout = async () => {
     try {
@@ -67,7 +41,7 @@ export function NavUser() {
   }
 
   const toProfile = () => {
-    if (user) {
+    if (user?.id) {
       window.location.href = `/users/${user.id}`
     }
   }
@@ -105,18 +79,18 @@ export function NavUser() {
     )
   }
 
-  const displayName = user.fullName || user.username || 'User'
-  const initials = user.fullName
-    ? user.fullName
+  const displayName = user?.name || user?.email?.split('@')[0] || 'User'
+  const initials = user?.name
+    ? user.name
         .split(' ')
         .map((n) => n[0])
         .join('')
         .toUpperCase()
-    : user.username
-      ? user.username.charAt(0).toUpperCase()
+    : user?.email
+      ? user.email.charAt(0).toUpperCase()
       : 'U'
 
-  const avatarUrl = user.photo || undefined
+  const avatarUrl = user?.image || undefined
 
   return (
     <SidebarMenu>
@@ -133,7 +107,7 @@ export function NavUser() {
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{displayName}</span>
-                <span className="text-muted-foreground truncate text-xs">{user.email}</span>
+                <span className="text-muted-foreground truncate text-xs">{user?.email}</span>
               </div>
               <IconDotsVertical className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -152,7 +126,7 @@ export function NavUser() {
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{displayName}</span>
-                  <span className="text-muted-foreground truncate text-xs">{user.email}</span>
+                  <span className="text-muted-foreground truncate text-xs">{user?.email}</span>
                 </div>
               </div>
             </DropdownMenuLabel>
