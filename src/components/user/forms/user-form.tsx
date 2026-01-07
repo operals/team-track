@@ -72,7 +72,7 @@ export function UserForm({
     departments:
       Array.isArray(initialData?.departments) && initialData.departments.length > 0
         ? initialData.departments.map((dept: any) =>
-            String(typeof dept === 'object' ? dept.id : dept),
+            String(typeof dept === 'object' && dept.departmentId ? dept.departmentId : dept),
           )
         : [],
     role: initialData?.roleId || initialData?.role?.id || undefined,

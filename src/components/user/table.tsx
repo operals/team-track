@@ -77,9 +77,14 @@ export function UserTable({ data }: UserTableProps) {
           <div className="flex flex-wrap gap-1">
             {departments.map((dept, index) => {
               const deptName =
-                typeof dept === 'object' && dept && 'name' in dept
-                  ? (dept as { name: string }).name
-                  : String(dept)
+                typeof dept === 'object' &&
+                dept &&
+                'department' in dept &&
+                dept.department &&
+                typeof dept.department === 'object' &&
+                'name' in dept.department
+                  ? (dept.department as { name: string }).name
+                  : '-'
               return (
                 <Badge key={index} variant="outline">
                   {deptName}
@@ -103,7 +108,8 @@ export function UserTable({ data }: UserTableProps) {
       header: 'Joined At',
       render: (date: unknown) => {
         const isValidDate = date === null || typeof date === 'string' || date instanceof Date
-        return isValidDate ? formatDate(date as string | Date | null) : '-'
+        const dateString = date instanceof Date ? date.toISOString() : (date as string | null)
+        return isValidDate ? formatDate(dateString) : '-'
       },
     },
     {
