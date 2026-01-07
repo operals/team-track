@@ -38,6 +38,16 @@ const data = {
       title: 'Team Members',
       url: '/users',
       icon: IconUsers,
+      items: [
+        {
+          title: 'Users',
+          url: '/users',
+        },
+        {
+          title: 'Departments',
+          url: '/departments',
+        },
+      ],
     },
     {
       title: 'Applicants',
@@ -79,7 +89,7 @@ const data = {
   navSecondary: [
     {
       title: 'Settings',
-      url: '/admin',
+      url: '#',
       icon: IconSettings,
     },
     // {
