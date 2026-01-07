@@ -16,7 +16,7 @@ export const accountsTable = pgTable('accounts', {
   providerAccountId: text('provider_account_id').notNull(),
   refresh_token: text('refresh_token'),
   access_token: text('access_token'),
-  expires_at: timestamp('expires_at'),
+  expires_at: text('expires_at'), // ISO 8601
   token_type: text('token_type'),
   scope: text('scope'),
   id_token: text('id_token'),
@@ -29,13 +29,13 @@ export const sessionsTable = pgTable('sessions', {
     .$defaultFn(() => crypto.randomUUID()),
   sessionToken: text('session_token').notNull().unique(),
   userId: text('user_id').notNull(),
-  expires: timestamp('expires').notNull(),
+  expires: text('expires').notNull(), // ISO 8601
 })
 
 export const verificationTokensTable = pgTable('verification_tokens', {
   identifier: text('identifier').notNull(),
   token: text('token').notNull().unique(),
-  expires: timestamp('expires').notNull(),
+  expires: text('expires').notNull(), // ISO 8601
 })
 
 // ============================================

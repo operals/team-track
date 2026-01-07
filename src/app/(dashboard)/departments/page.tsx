@@ -13,8 +13,8 @@ interface Department {
   name: string
   description: string | null
   isActive: boolean
-  createdAt: Date
-  updatedAt: Date
+  createdAt: string
+  updatedAt: string
   userCount: number
 }
 

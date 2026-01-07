@@ -13,8 +13,12 @@ export const departmentsTable = pgTable('departments', {
   name: varchar('name', { length: 100 }).notNull().unique(),
   description: text('description'),
   isActive: boolean('is_active').default(true).notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdAt: text('created_at')
+    .$defaultFn(() => new Date().toISOString())
+    .notNull(),
+  updatedAt: text('updated_at')
+    .$defaultFn(() => new Date().toISOString())
+    .notNull(),
 })
 
 // ============================================
@@ -27,7 +31,9 @@ export const userDepartmentsTable = pgTable('user_departments', {
     .$defaultFn(() => crypto.randomUUID()),
   userId: text('user_id').notNull(),
   departmentId: text('department_id').notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  createdAt: text('created_at')
+    .$defaultFn(() => new Date().toISOString())
+    .notNull(),
 })
 
 // ============================================

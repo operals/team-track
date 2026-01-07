@@ -473,17 +473,15 @@ async function seedMarvelCharacters(departments: any[], roles: any[]) {
           password: hashedPassword,
           jobTitle: character.jobTitle,
           roleId: character.role,
-          birthDate: new Date(character.birthDate),
+          birthDate: character.birthDate,
           primaryPhone: character.primaryPhone,
           secondaryPhone: character.secondaryPhone || null,
           employmentType: character.employmentType as any,
           nationality: character.nationality,
           identityNumber: character.identityNumber,
-          workPermitExpiry: character.workPermitExpiry
-            ? new Date(character.workPermitExpiry)
-            : null,
+          workPermitExpiry: character.workPermitExpiry || null,
           address: character.address,
-          joinedAt: new Date(character.joinedAt),
+          joinedAt: character.joinedAt,
           isActive: character.isActive,
         })
         .returning()
@@ -654,10 +652,18 @@ async function seedPayrollHistory(users: any[]) {
 
         // Add payment details if paid
         if (status === 'paid') {
-          payrollData.paymentDate = new Date(period.year, parseInt(period.month) - 1, 28)
+          payrollData.paymentDate = new Date(
+            period.year,
+            parseInt(period.month) - 1,
+            28,
+          ).toISOString()
           payrollData.paymentReference = `TXN-${Math.floor(Math.random() * 1000000)}`
           payrollData.paymentNotes = 'Payment processed successfully'
-          payrollData.processedAt = new Date(period.year, parseInt(period.month) - 1, 28)
+          payrollData.processedAt = new Date(
+            period.year,
+            parseInt(period.month) - 1,
+            28,
+          ).toISOString()
         }
 
         const [created] = await db.insert(payrollTable).values(payrollData).returning()
@@ -753,8 +759,8 @@ async function seedInventory(users: any[]) {
           serialNumber: item.serialNumber,
           holderId: item.holder,
           status: item.status,
-          purchaseDate: new Date(item.purchaseDate),
-          warrantyExpiry: item.warrantyExpiry ? new Date(item.warrantyExpiry) : null,
+          purchaseDate: item.purchaseDate,
+          warrantyExpiry: item.warrantyExpiry || null,
           notes: item.notes || null,
         })
         .returning()
@@ -820,8 +826,8 @@ async function seedLeaves(users: any[]) {
           .values({
             userId: user.id,
             type: getRandomItem(leaveTypes),
-            startDate,
-            endDate,
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
             status,
             reason: getRandomItem(leaveReasons),
             note:

@@ -97,8 +97,8 @@ export function ComboboxMultiSelect<TFieldValues extends FieldValues>({
                         selectedValues.map((value) => (
                           <Badge className="mr-1" key={value} variant="secondary">
                             {options.find((option) => option.value === value)?.label}
-                            <button
-                              className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                            <span
+                              className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
                               onClick={(e) => handleRemove(value, e)}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
@@ -109,10 +109,11 @@ export function ComboboxMultiSelect<TFieldValues extends FieldValues>({
                                 e.preventDefault()
                                 e.stopPropagation()
                               }}
-                              type="button"
+                              role="button"
+                              tabIndex={0}
                             >
                               <X className="size-3 text-muted-foreground hover:text-foreground" />
-                            </button>
+                            </span>
                           </Badge>
                         ))
                       ) : (

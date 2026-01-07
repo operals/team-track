@@ -17,29 +17,16 @@ type User = InferSelectModel<typeof usersTable> & {
     id: string
     userId: string
     departmentId: string
-    createdAt: Date | string
+    createdAt: string | null
     department: {
       id: string
       name: string
       isActive: boolean
-      createdAt: Date | string
-      updatedAt: Date | string
+      createdAt: string | null
+      updatedAt: string | null
       description: string | null
     }
   }>
-}
-
-// Serializable version of User type for RSC boundaries
-type SerializableUser = Omit<
-  User,
-  'birthDate' | 'joinedAt' | 'workPermitExpiry' | 'createdAt' | 'updatedAt' | 'emailVerified'
-> & {
-  birthDate?: string | Date | null
-  joinedAt?: string | Date | null
-  workPermitExpiry?: string | Date | null
-  createdAt?: string | Date | null
-  updatedAt?: string | Date | null
-  emailVerified?: string | Date | null
 }
 
 import { useForm, Controller, SubmitHandler } from 'react-hook-form'
@@ -54,11 +41,10 @@ import { BirthdatePicker } from '@/components/date-pickers/birthdate-picker'
 import { JoinedDatePicker } from '@/components/date-pickers/joined-date-picker'
 import { WorkPermitExpiryPicker } from '@/components/date-pickers/work-permit-expiry-picker'
 import { MultiFileUpload } from '@/components/ui/multi-file-upload'
-import { formatDateForInput } from '@/lib/date-utils'
 import { COUNTRIES } from '@/lib/countries'
 
 interface UserFormProps {
-  initialData?: Partial<SerializableUser>
+  initialData?: Partial<User>
   onSubmit?: (data: UserFormValues) => Promise<any>
   formAction?: (formData: FormData) => Promise<void>
   mode: 'create' | 'edit'
@@ -91,16 +77,14 @@ export function UserForm({
         : [],
     role: initialData?.roleId || initialData?.role?.id || undefined,
     jobTitle: initialData?.jobTitle || '',
-    birthDate: initialData?.birthDate ? formatDateForInput(initialData.birthDate) : '',
+    birthDate: initialData?.birthDate?.split('T')[0] || '', // Extract YYYY-MM-DD from ISO
     primaryPhone: initialData?.primaryPhone || '',
     secondaryPhone: initialData?.secondaryPhone || '',
     secondaryEmail: initialData?.secondaryEmail || '',
     employmentType: initialData?.employmentType || 'other',
     nationality: initialData?.nationality || '',
     identityNumber: initialData?.identityNumber || '',
-    workPermitExpiry: initialData?.workPermitExpiry
-      ? formatDateForInput(initialData.workPermitExpiry)
-      : undefined,
+    workPermitExpiry: initialData?.workPermitExpiry?.split('T')[0] || undefined, // Extract YYYY-MM-DD
     address: initialData?.address || '',
     documents: Array.isArray(initialData?.documents)
       ? initialData.documents.map((doc) => {
@@ -112,11 +96,9 @@ export function UserForm({
         })
       : [],
     isActive: initialData?.isActive ?? true,
-    joinedAt: initialData?.joinedAt
-      ? formatDateForInput(initialData.joinedAt)
-      : mode === 'create'
-        ? formatDateForInput(new Date())
-        : undefined,
+    joinedAt:
+      initialData?.joinedAt?.split('T')[0] || // Extract YYYY-MM-DD
+      (mode === 'create' ? new Date().toISOString().split('T')[0] : undefined),
   }
 
   const {

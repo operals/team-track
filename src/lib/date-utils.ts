@@ -1,16 +1,16 @@
 /**
  * Unified date formatting utilities for consistent date display across the application
+ * All dates are stored as ISO 8601 strings in the database
  */
 
 /**
- * Formats a date string or Date object to "Month Day, Year" format
+ * Formats an ISO date string to "Month Day, Year" format
  * Example: "October 15, 2025"
  */
-export function formatDate(value?: string | Date | null): string {
-  if (!value) return 'Not specified'
+export function formatDate(isoString?: string | null): string {
+  if (!isoString) return 'Not specified'
 
-  const date = typeof value === 'string' ? new Date(value) : value
-
+  const date = new Date(isoString)
   if (isNaN(date.getTime())) return 'Not specified'
 
   return date.toLocaleDateString('en-US', {
@@ -21,52 +21,42 @@ export function formatDate(value?: string | Date | null): string {
 }
 
 /**
- * Formats a date for form inputs (YYYY-MM-DD format)
- * Uses local timezone to avoid off-by-one errors
+ * Extracts YYYY-MM-DD from an ISO string for form inputs
+ * If the ISO string is already in YYYY-MM-DD format, returns it as-is
  */
-export function formatDateForInput(value?: string | Date | null): string {
-  if (!value) return ''
-
-  const date = typeof value === 'string' ? new Date(value) : value
-
-  if (isNaN(date.getTime())) return ''
-
-  // Use local timezone to avoid off-by-one errors
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-
-  return `${year}-${month}-${day}`
+export function formatDateForInput(isoString?: string | null): string {
+  if (!isoString) return ''
+  // Extract just the date part (YYYY-MM-DD) from ISO string
+  return isoString.split('T')[0]
 }
 
 /**
- * Parses a date string and returns a Date object or undefined
+ * Parses an ISO date string and returns a Date object or undefined
  */
-export function parseDate(value?: string | null): Date | undefined {
-  if (!value) return undefined
-
-  const date = new Date(value)
+export function parseDate(isoString?: string | null): Date | undefined {
+  if (!isoString) return undefined
+  const date = new Date(isoString)
   return isNaN(date.getTime()) ? undefined : date
 }
 
 /**
- * Checks if a date is in the past
+ * Checks if an ISO date string is in the past
  */
-export function isPastDate(date: Date): boolean {
+export function isPastDate(isoString: string): boolean {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const checkDate = new Date(date)
+  const checkDate = new Date(isoString)
   checkDate.setHours(0, 0, 0, 0)
   return checkDate < today
 }
 
 /**
- * Checks if a date is in the future
+ * Checks if an ISO date string is in the future
  */
-export function isFutureDate(date: Date): boolean {
+export function isFutureDate(isoString: string): boolean {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const checkDate = new Date(date)
+  const checkDate = new Date(isoString)
   checkDate.setHours(0, 0, 0, 0)
   return checkDate > today
 }

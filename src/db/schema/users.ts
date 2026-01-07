@@ -28,12 +28,12 @@ export const usersTable = pgTable('users', {
   email: varchar('email', { length: 255 }).notNull().unique(),
   username: varchar('username', { length: 255 }).unique(),
   password: text('password'),
-  emailVerified: timestamp('email_verified'),
+  emailVerified: text('email_verified'), // ISO 8601: "YYYY-MM-DDTHH:mm:ss.sssZ"
 
   // Personal Information
   fullName: varchar('full_name', { length: 255 }).notNull(),
   photo: text('photo'), // URL to media file
-  birthDate: timestamp('birth_date'),
+  birthDate: text('birth_date'), // ISO 8601: "YYYY-MM-DD"
 
   // Contact Information
   primaryPhone: varchar('primary_phone', { length: 50 }),
@@ -46,7 +46,7 @@ export const usersTable = pgTable('users', {
   employmentType: employmentTypeEnum('employment_type').default('other').notNull(),
   nationality: varchar('nationality', { length: 100 }),
   identityNumber: varchar('identity_number', { length: 100 }),
-  workPermitExpiry: timestamp('work_permit_expiry'),
+  workPermitExpiry: text('work_permit_expiry'), // ISO 8601: "YYYY-MM-DD"
 
   // Status
   isActive: boolean('is_active').default(true).notNull(),
@@ -56,9 +56,13 @@ export const usersTable = pgTable('users', {
   documents: json('documents').$type<string[]>().default([]), // Array of media URLs
 
   // Timestamps
-  joinedAt: timestamp('joined_at'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  joinedAt: text('joined_at'), // ISO 8601: "YYYY-MM-DD"
+  createdAt: text('created_at')
+    .$defaultFn(() => new Date().toISOString())
+    .notNull(),
+  updatedAt: text('updated_at')
+    .$defaultFn(() => new Date().toISOString())
+    .notNull(),
 })
 
 // ============================================

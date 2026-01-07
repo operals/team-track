@@ -65,15 +65,19 @@ export const payrollSettingsTable = pgTable('payroll_settings', {
 
   // Status and Timing
   isActive: boolean('is_active').default(true).notNull(),
-  startDate: timestamp('start_date').notNull(),
-  endDate: timestamp('end_date'), // Null = ongoing
+  startDate: text('start_date').notNull(), // ISO 8601: "YYYY-MM-DD"
+  endDate: text('end_date'), // Null = ongoing
 
   // Notes
   notes: text('notes'),
 
   // Timestamps
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdAt: text('created_at')
+    .$defaultFn(() => new Date().toISOString())
+    .notNull(),
+  updatedAt: text('updated_at')
+    .$defaultFn(() => new Date().toISOString())
+    .notNull(),
 })
 
 // ============================================

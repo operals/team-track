@@ -42,16 +42,20 @@ export const inventoryTable = pgTable('inventory', {
   status: inventoryStatusEnum('status').default('inStock').notNull(),
 
   // Dates
-  purchaseDate: timestamp('purchase_date'),
-  warrantyExpiry: timestamp('warranty_expiry'),
+  purchaseDate: text('purchase_date'), // ISO 8601: "YYYY-MM-DD"
+  warrantyExpiry: text('warranty_expiry'), // ISO 8601: "YYYY-MM-DD"
 
   // Media & Notes
   images: json('images').$type<string[]>().default([]), // Array of media URLs
   notes: text('notes'),
 
   // Timestamps
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdAt: text('created_at')
+    .$defaultFn(() => new Date().toISOString())
+    .notNull(),
+  updatedAt: text('updated_at')
+    .$defaultFn(() => new Date().toISOString())
+    .notNull(),
 })
 
 // ============================================

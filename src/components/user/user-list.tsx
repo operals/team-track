@@ -18,13 +18,13 @@ type User = InferSelectModel<typeof usersTable> & {
     id: string
     userId: string
     departmentId: string
-    createdAt: Date
+    createdAt: string
     department: {
       id: string
       name: string
       isActive: boolean
-      createdAt: Date
-      updatedAt: Date
+      createdAt: string
+      updatedAt: string
       description: string | null
     }
   }>

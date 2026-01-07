@@ -61,7 +61,7 @@ export const payrollTable = pgTable('payroll', {
   totalAmount: numeric('total_amount', { precision: 10, scale: 2 }).notNull(),
 
   // Payment Tracking
-  paymentDate: timestamp('payment_date'),
+  paymentDate: text('payment_date'), // ISO 8601: "YYYY-MM-DD"
   paymentReference: text('payment_reference'),
   paymentNotes: text('payment_notes'),
 
@@ -70,11 +70,15 @@ export const payrollTable = pgTable('payroll', {
 
   // Processing Info
   processedById: text('processed_by_id'),
-  processedAt: timestamp('processed_at'),
+  processedAt: text('processed_at'), // ISO 8601
 
   // Timestamps
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdAt: text('created_at')
+    .$defaultFn(() => new Date().toISOString())
+    .notNull(),
+  updatedAt: text('updated_at')
+    .$defaultFn(() => new Date().toISOString())
+    .notNull(),
 })
 
 // ============================================

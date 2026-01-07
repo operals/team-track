@@ -61,7 +61,7 @@ export const applicantsTable = pgTable('applicants', {
     .default('unemployed')
     .notNull(),
   expectedSalary: integer('expected_salary'),
-  availabilityDate: timestamp('availability_date'),
+  availabilityDate: text('availability_date'), // ISO 8601: "YYYY-MM-DD"
 
   // Application Details
   source: applicationSourceEnum('source'),
@@ -70,13 +70,19 @@ export const applicantsTable = pgTable('applicants', {
 
   // Application Management
   status: applicationStatusEnum('status').default('new').notNull(),
-  applicationDate: timestamp('application_date').defaultNow().notNull(),
+  applicationDate: text('application_date')
+    .$defaultFn(() => new Date().toISOString())
+    .notNull(),
   internalNotes: text('internal_notes'), // Rich text stored as HTML/JSON
 
   // Compliance
   consentToDataStorage: boolean('consent_to_data_storage').default(false).notNull(),
 
   // Timestamps
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdAt: text('created_at')
+    .$defaultFn(() => new Date().toISOString())
+    .notNull(),
+  updatedAt: text('updated_at')
+    .$defaultFn(() => new Date().toISOString())
+    .notNull(),
 })

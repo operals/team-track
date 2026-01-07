@@ -13,8 +13,12 @@ export const rolesTable = pgTable('roles', {
   name: varchar('name', { length: 50 }).notNull().unique(), // 'admin', 'manager', 'employee'
   displayName: varchar('display_name', { length: 100 }).notNull(), // 'Administrator', 'Manager', 'Employee'
   description: text('description'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdAt: text('created_at')
+    .$defaultFn(() => new Date().toISOString())
+    .notNull(),
+  updatedAt: text('updated_at')
+    .$defaultFn(() => new Date().toISOString())
+    .notNull(),
 })
 
 // ============================================
