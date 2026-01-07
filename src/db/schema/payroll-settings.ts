@@ -1,9 +1,6 @@
 import {
   pgTable,
   text,
-  varchar,
-  integer,
-  timestamp,
   pgEnum,
   boolean,
   json,

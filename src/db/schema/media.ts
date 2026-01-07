@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, timestamp } from 'drizzle-orm/pg-core'
+import { pgTable, text, varchar, integer } from 'drizzle-orm/pg-core'
 
 // ============================================
 // Media Table
