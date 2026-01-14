@@ -4,7 +4,9 @@ import * as React from 'react'
 import type { InferSelectModel } from 'drizzle-orm'
 import { leavesTable, usersTable } from '@/db/schema'
 
-type LeaveDay = InferSelectModel<typeof leavesTable>
+type LeaveDay = InferSelectModel<typeof leavesTable> & {
+  user?: User | null
+}
 type User = InferSelectModel<typeof usersTable>
 import { Badge } from '../ui/badge'
 import { DataTable } from '../data-table'
@@ -79,10 +81,10 @@ export function LeaveDayTable({ data, enablePagination = true }: LeaveDayTablePr
       key: 'user' as keyof LeaveDay,
       header: 'Applicant',
       render: (value: unknown, item: LeaveDay) => {
-        const user = item.userId
-        return typeof user === 'object' && user !== null && 'fullName' in user
-          ? (user as User).fullName
-          : user || '-'
+        const user = item.user
+        return user && typeof user === 'object' && 'fullName' in user
+          ? user.fullName
+          : '-'
       },
     },
     {

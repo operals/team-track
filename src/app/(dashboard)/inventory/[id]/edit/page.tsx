@@ -19,9 +19,6 @@ export default async function EditInventoryPage({ params }: EditInventoryPagePro
   try {
     const item = await db.query.inventoryTable.findFirst({
       where: eq(inventoryTable.id, id),
-      with: {
-        holder: true,
-      },
     })
 
     if (!item) {

@@ -8,6 +8,7 @@ import {
   payrollTable,
   inventoryTable,
   leavesTable,
+  applicantsTable,
 } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { hash } from 'bcryptjs'
@@ -44,6 +45,10 @@ export async function seed() {
     console.log('🏖️ Creating leave records...')
     await seedLeaves(users)
 
+    // 7. Create Applicants
+    console.log('📝 Creating job applicants...')
+    await seedApplicants()
+
     console.log('✅ Database seeding completed successfully!')
     return { success: true }
   } catch (error) {
@@ -75,7 +80,7 @@ async function seedMarvelCharacters(departments: any[], roles: any[]) {
   const marvelCharacters = [
     {
       fullName: 'Mohammad Ahmadian',
-      email: 'mohamad92ahm@gmail.com',
+      email: 'moh92ahmadian@gmail.com',
       username: 'mohammad',
       secondaryEmail: '',
       password: '123321',
@@ -914,4 +919,195 @@ async function seedRolesAndDepartments() {
   }
 
   console.log('Roles and departments seeding completed!')
+}
+
+// ============================================
+// Seed Applicants
+// ============================================
+
+async function seedApplicants() {
+  const applicantsData = [
+    {
+      fullName: 'Sarah Johnson',
+      email: 'sarah.johnson@example.com',
+      phone: '+1-555-0101',
+      linkedInUrl: 'https://linkedin.com/in/sarahjohnson',
+      positionAppliedFor: 'Senior Software Engineer',
+      yearsOfExperience: 8,
+      educationLevel: 'bachelor' as const,
+      currentEmploymentStatus: 'notice-period' as const,
+      expectedSalary: 120000,
+      availabilityDate: '2026-03-01',
+      source: 'linkedin' as const,
+      bio: 'Experienced full-stack developer with expertise in React, Node.js, and cloud technologies. Passionate about building scalable applications and mentoring junior developers.',
+      consentToDataStorage: true,
+    },
+    {
+      fullName: 'Michael Chen',
+      email: 'michael.chen@example.com',
+      phone: '+1-555-0102',
+      portfolioUrl: 'https://michaelchen.dev',
+      positionAppliedFor: 'Frontend Developer',
+      yearsOfExperience: 5,
+      educationLevel: 'bachelor' as const,
+      currentEmploymentStatus: 'employed' as const,
+      expectedSalary: 95000,
+      availabilityDate: '2026-04-15',
+      source: 'website' as const,
+      bio: 'Frontend specialist with strong UI/UX sensibilities. Expert in React, TypeScript, and modern CSS frameworks. Love creating delightful user experiences.',
+      consentToDataStorage: true,
+    },
+    {
+      fullName: 'Emily Rodriguez',
+      email: 'emily.rodriguez@example.com',
+      phone: '+1-555-0103',
+      linkedInUrl: 'https://linkedin.com/in/emilyrodriguez',
+      positionAppliedFor: 'UX Designer',
+      yearsOfExperience: 6,
+      educationLevel: 'master' as const,
+      currentEmploymentStatus: 'unemployed' as const,
+      expectedSalary: 85000,
+      availabilityDate: '2026-02-01',
+      source: 'referral' as const,
+      bio: 'User-centered designer with a background in psychology. Specialized in conducting user research, creating wireframes, and building design systems.',
+      consentToDataStorage: true,
+    },
+    {
+      fullName: 'David Kumar',
+      email: 'david.kumar@example.com',
+      phone: '+1-555-0104',
+      positionAppliedFor: 'DevOps Engineer',
+      yearsOfExperience: 7,
+      educationLevel: 'bachelor' as const,
+      currentEmploymentStatus: 'employed' as const,
+      expectedSalary: 115000,
+      availabilityDate: '2026-05-01',
+      source: 'job-board' as const,
+      bio: 'DevOps engineer with expertise in AWS, Docker, Kubernetes, and CI/CD pipelines. Experienced in infrastructure automation and monitoring.',
+      consentToDataStorage: true,
+    },
+    {
+      fullName: 'Jessica Martinez',
+      email: 'jessica.martinez@example.com',
+      phone: '+1-555-0105',
+      linkedInUrl: 'https://linkedin.com/in/jessicamartinez',
+      portfolioUrl: 'https://jmartinez.design',
+      positionAppliedFor: 'Product Manager',
+      yearsOfExperience: 9,
+      educationLevel: 'master' as const,
+      currentEmploymentStatus: 'notice-period' as const,
+      expectedSalary: 130000,
+      availabilityDate: '2026-03-15',
+      source: 'linkedin' as const,
+      bio: 'Strategic product manager with a proven track record of launching successful products. Skilled in agile methodologies, user research, and stakeholder management.',
+      consentToDataStorage: true,
+    },
+    {
+      fullName: 'Ryan Thompson',
+      email: 'ryan.thompson@example.com',
+      phone: '+1-555-0106',
+      positionAppliedFor: 'Junior Developer',
+      yearsOfExperience: 1,
+      educationLevel: 'bachelor' as const,
+      currentEmploymentStatus: 'student' as const,
+      expectedSalary: 65000,
+      availabilityDate: '2026-06-01',
+      source: 'website' as const,
+      bio: 'Recent computer science graduate eager to start my career in software development. Strong foundation in JavaScript, Python, and database design. Quick learner with a passion for coding.',
+      consentToDataStorage: true,
+    },
+    {
+      fullName: 'Aisha Patel',
+      email: 'aisha.patel@example.com',
+      phone: '+1-555-0107',
+      linkedInUrl: 'https://linkedin.com/in/aishapatel',
+      positionAppliedFor: 'Data Scientist',
+      yearsOfExperience: 4,
+      educationLevel: 'phd' as const,
+      currentEmploymentStatus: 'unemployed' as const,
+      expectedSalary: 110000,
+      availabilityDate: '2026-02-15',
+      source: 'referral' as const,
+      bio: 'Data scientist with PhD in Machine Learning. Expert in Python, R, TensorFlow, and statistical modeling. Published researcher with experience in predictive analytics.',
+      consentToDataStorage: true,
+    },
+    {
+      fullName: 'Thomas Anderson',
+      email: 'thomas.anderson@example.com',
+      phone: '+1-555-0108',
+      portfolioUrl: 'https://tanderson.tech',
+      positionAppliedFor: 'Mobile Developer',
+      yearsOfExperience: 6,
+      educationLevel: 'bachelor' as const,
+      currentEmploymentStatus: 'employed' as const,
+      expectedSalary: 105000,
+      availabilityDate: '2026-04-01',
+      source: 'job-board' as const,
+      bio: 'Mobile app developer specializing in React Native and Flutter. Built and published 15+ apps with millions of downloads. Passionate about mobile UX and performance optimization.',
+      consentToDataStorage: true,
+    },
+    {
+      fullName: 'Olivia Williams',
+      email: 'olivia.williams@example.com',
+      phone: '+1-555-0109',
+      linkedInUrl: 'https://linkedin.com/in/oliviawilliams',
+      positionAppliedFor: 'Marketing Manager',
+      yearsOfExperience: 7,
+      educationLevel: 'master' as const,
+      currentEmploymentStatus: 'notice-period' as const,
+      expectedSalary: 95000,
+      availabilityDate: '2026-03-01',
+      source: 'linkedin' as const,
+      bio: 'Digital marketing expert with focus on growth hacking and content strategy. Experienced in SEO, SEM, social media marketing, and analytics. Led campaigns that increased revenue by 300%.',
+      consentToDataStorage: true,
+    },
+    {
+      fullName: 'James Wilson',
+      email: 'james.wilson@example.com',
+      phone: '+1-555-0110',
+      positionAppliedFor: 'Backend Developer',
+      yearsOfExperience: 5,
+      educationLevel: 'bachelor' as const,
+      currentEmploymentStatus: 'employed' as const,
+      expectedSalary: 100000,
+      availabilityDate: '2026-05-15',
+      source: 'website' as const,
+      bio: 'Backend engineer with strong experience in Node.js, PostgreSQL, and microservices architecture. Focus on building robust, scalable APIs and optimizing database performance.',
+      consentToDataStorage: true,
+    },
+  ]
+
+  const applicants = []
+  for (const applicant of applicantsData) {
+    try {
+      const [created] = await db
+        .insert(applicantsTable)
+        .values({
+          fullName: applicant.fullName,
+          email: applicant.email,
+          phone: applicant.phone,
+          linkedInUrl: applicant.linkedInUrl || null,
+          portfolioUrl: applicant.portfolioUrl || null,
+          positionAppliedFor: applicant.positionAppliedFor,
+          yearsOfExperience: applicant.yearsOfExperience,
+          educationLevel: applicant.educationLevel,
+          currentEmploymentStatus: applicant.currentEmploymentStatus,
+          expectedSalary: applicant.expectedSalary || null,
+          availabilityDate: applicant.availabilityDate || null,
+          source: applicant.source || null,
+          bio: applicant.bio,
+          cv: '', // No CV provided as per requirement
+          status: 'new',
+          consentToDataStorage: applicant.consentToDataStorage,
+        })
+        .returning()
+      applicants.push(created)
+      console.log(`  ✓ Created applicant: ${applicant.fullName}`)
+    } catch (error) {
+      console.error(`  ✗ Failed to create applicant ${applicant.fullName}:`, error)
+    }
+  }
+
+  console.log(`  ✓ Created ${applicants.length} applicants`)
+  return applicants
 }

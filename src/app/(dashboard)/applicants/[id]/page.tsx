@@ -18,9 +18,6 @@ export default async function ApplicantPage({ params }: ApplicantPageProps) {
   try {
     const applicant = await db.query.applicantsTable.findFirst({
       where: eq(applicantsTable.id, id),
-      with: {
-        cv: true,
-      },
     })
 
     if (!applicant) {

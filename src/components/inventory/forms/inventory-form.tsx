@@ -79,6 +79,7 @@ export function InventoryForm({
       model: initialData?.model || '',
       serialNumber: initialData?.serialNumber || '',
       status: (initialData?.status as any) || 'inStock',
+      holder: initialData?.holderId ? String(initialData.holderId) : '__none__',
       purchaseDate: initialData?.purchaseDate
         ? new Date(initialData.purchaseDate).toISOString().split('T')[0]
         : undefined,

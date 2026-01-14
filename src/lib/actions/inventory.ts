@@ -13,7 +13,7 @@ export async function updateInventoryInline(
   // Check authentication
   await requireAuth()
 
-  const updateData: any = { updatedAt: new Date() }
+  const updateData: any = { updatedAt: new Date().toISOString() }
 
   if (data.status) {
     updateData.status = data.status as any

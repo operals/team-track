@@ -14,13 +14,10 @@ export const metadata: Metadata = {
 export default async function ApplicantsPage() {
   await requireAuth()
 
-  // Fetch Applicants with cv relation
+  // Fetch Applicants
   const applicants = await db.query.applicantsTable.findMany({
     orderBy: (applicants, { desc }) => [desc(applicants.applicationDate)],
     limit: 100,
-    with: {
-      cv: true,
-    },
   })
 
   return (
